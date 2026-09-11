@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>AIenda</title>
+<title>Aienda</title>
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
@@ -411,7 +411,7 @@
 <div id="auth-screen" class="wrap">
   <div class="auth-head">
     <span class="chick">🔐</span>
-    <div class="brand">AIenda</div>
+    <div class="brand">Aienda</div>
     <div class="sub">Tu día a día, en un solo lugar</div>
   </div>
 
@@ -442,7 +442,7 @@
   <div class="topbar">
     <div class="chick" id="topbar-avatar">🐥</div>
     <div>
-      <div class="brand" id="topbar-brand">AIenda</div>
+      <div class="brand" id="topbar-brand">Aienda</div>
       <div class="sub">Tu agenda del día a día</div>
     </div>
     <div class="topbar-actions">
@@ -656,7 +656,8 @@ function blankState(){
       pushEnabled:false, // notificaciones push — apagadas por defecto, se activan desde Configuración
       theme:'clasico',
       avatar:'✨',
-      appName:'AIenda',
+      appName:'Aienda',
+      nameSet:false, // se vuelve true cuando la persona escribe su nombre en la bienvenida
       textScale:1 // 1 = tamaño estándar; se puede aumentar desde Configuración
     }
   };
@@ -803,6 +804,32 @@ async function onLoggedIn(user){
   renderAll(); renderSvOtrosFields(); renderMetricasChips();
   loadWeather();
   refreshAccountInfo();
+  if(!state.settings.nameSet) openNameOnboardingModal();
+}
+
+/* ================= BIENVENIDA: preguntar el nombre la primera vez ================= */
+function openNameOnboardingModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>¡Bienvenido a Aienda! 👋</h3>'+
+    '<p style="font-size:14px;color:var(--ink-soft);margin-top:-8px;">¿Cómo te llamas? Así te vamos a saludar cada vez que abras la app.</p>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow"><label>Tu nombre</label><input id="onb-nombre" placeholder="Ej: María"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="onb-save">Continuar</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('onb-nombre').focus();
+  const finish = ()=>{
+    const val = document.getElementById('onb-nombre').value.trim();
+    state.settings.appName = val || 'Aienda';
+    state.settings.nameSet = true;
+    saveState(); applyPersonalization(); renderAll();
+    root.innerHTML='';
+  };
+  document.getElementById('onb-save').onclick = finish;
+  document.getElementById('onb-nombre').addEventListener('keydown', e=>{ if(e.key==='Enter') finish(); });
 }
 
 async function signOut(){
@@ -824,6 +851,7 @@ async function importLegacyPollito(){
     if(error) throw error;
     if(!data || !data.data){ showToast('No se encontraron datos de Pollito', 'error'); return; }
     state = Object.assign(blankState(), data.data);
+    state.settings.nameSet = true;
     saveState();
     applyPersonalization(); applyTabVisibility(); applyWeatherVisibility(); applyMicVisibility(); applyTextScale();
     renderAll(); renderSvOtrosFields(); renderMetricasChips();
@@ -908,7 +936,7 @@ function getWeekDatesFrom(monday){
 /* ================= GREETING + VERSE ================= */
 function renderGreeting(){
   const h = new Date().getHours();
-  const nombre = state.settings.appName || 'AIenda';
+  const nombre = state.settings.appName || 'Aienda';
   let saludo = 'Buenos días, '+nombre;
   if(h>=12 && h<19) saludo='Buenas tardes, '+nombre;
   else if(h>=19 || h<5) saludo='Buenas noches, '+nombre;
@@ -927,7 +955,7 @@ function applyPersonalization(){
     document.body.classList.add('theme-'+state.settings.theme);
   }
   document.getElementById('topbar-avatar').textContent = state.settings.avatar || '✨';
-  document.getElementById('topbar-brand').textContent = state.settings.appName || 'AIenda';
+  document.getElementById('topbar-brand').textContent = state.settings.appName || 'Aienda';
 }
 
 function applyTextScale(){
@@ -1768,7 +1796,7 @@ async function exportSignosPDF(){
   const doc = new jsPDF();
 
   doc.setFontSize(16);
-  doc.text((state.settings.appName||'AIenda')+' — Historial de signos vitales', 14, 18);
+  doc.text((state.settings.appName||'Aienda')+' — Historial de signos vitales', 14, 18);
   doc.setFontSize(10);
   doc.text('Generado el ' + new Date().toLocaleDateString('es-CO'), 14, 25);
 
@@ -1804,7 +1832,7 @@ async function exportSignosPDF(){
 
   if(navigator.canShare && navigator.canShare({files:[file]})){
     try{
-      await navigator.share({ files:[file], title:'Signos vitales — AIenda' });
+      await navigator.share({ files:[file], title:'Signos vitales — Aienda' });
       return;
     }catch(e){ /* si cancela el compartir, no pasa nada */ return; }
   }
@@ -2021,7 +2049,7 @@ function openSettingsModal(){
     '<button class="link-btn" id="btn-import-legacy" style="padding:0 2px;margin-bottom:6px;">↥ Importar datos de Pollito (una sola vez)</button><br>'+
     '<button class="link-btn" id="btn-logout" style="padding:0 2px;color:var(--brick);margin-bottom:10px;">Cerrar sesión</button>'+
     '<div class="settings-subtitle">Nombre</div>'+
-    '<div class="frow"><input id="settings-name" value="'+esc(state.settings.appName||'AIenda')+'" placeholder="Ej: María"></div>'+
+    '<div class="frow"><input id="settings-name" value="'+esc(state.settings.appName||'Aienda')+'" placeholder="Ej: María"></div>'+
     '<div class="settings-subtitle">Avatar</div>'+
     '<div class="avatar-row">'+avatars+'</div>'+
     '<div class="settings-subtitle">Paleta de colores</div>'+
@@ -2042,7 +2070,7 @@ function openSettingsModal(){
 
   document.getElementById('settings-name').onchange = (e)=>{
     const val = e.target.value.trim();
-    state.settings.appName = val || 'AIenda';
+    state.settings.appName = val || 'Aienda';
     saveState(); applyPersonalization(); renderAll();
     showToast('Nombre actualizado', 'ok');
   };
