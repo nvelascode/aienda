@@ -358,6 +358,12 @@
     padding:12px 14px;margin-bottom:8px;font-size:14px;font-weight:800;cursor:pointer;
   }
   .settings-row input[type="checkbox"]{width:20px;height:20px;accent-color:var(--moss);}
+  .settings-input{
+    width:100%;border:1.5px solid var(--line);border-radius:11px;
+    padding:9px 11px;font-size:14px;font-family:inherit;font-weight:700;color:var(--ink);
+    background:#FFFEFB;
+  }
+  .settings-input:focus{outline:none;border-color:var(--yolk-dark);}
 
   .modal-bg{
     position:fixed;inset:0;background:rgba(58,46,34,.45);
@@ -623,7 +629,7 @@ const THEMES = [
   {key:'atardecer',  label:'Atardecer',  color:'#E67E5B'},
   {key:'lavanda',    label:'Lavanda',    color:'#9B7EBD'},
 ];
-const AVATAR_OPTIONS = ['✨','🐥','🐶','🐱','🐰','🦊','🐻','🦁','🐞','🦋','🌻','🧡','⭐','🍀','😊'];
+const AVATAR_OPTIONS = ['✨','🐥','🐶','🐱','🐰','🦊','🐻','🦁','🐞','🌻','🧡','⭐','🍀','😊'];
 
 const TAB_DEFS = [
   {key:'actividades',  label:'Actividades',   icon:'✅'},
@@ -814,7 +820,6 @@ function openNameOnboardingModal(){
   const bg = document.createElement('div'); bg.className='modal-bg';
   const modal = document.createElement('div'); modal.className='modal';
   modal.innerHTML = '<h3>¡Bienvenido a Aienda! 👋</h3>'+
-    '<p style="font-size:14px;color:var(--ink-soft);margin-top:-8px;">¿Cómo te llamas? Así te vamos a saludar cada vez que abras la app.</p>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow"><label>Tu nombre</label><input id="onb-nombre" placeholder="Ej: María"></div>'+
     '</div>'+
@@ -2046,10 +2051,9 @@ function openSettingsModal(){
   modal.innerHTML = '<h3>⚙️ Configuración</h3>'+
     '<div class="settings-subtitle">Cuenta</div>'+
     '<div class="settings-row" style="cursor:default;"><span>✉️ <span id="settings-account-email">'+(currentUser?esc(currentUser.email):'')+'</span></span></div>'+
-    '<button class="link-btn" id="btn-import-legacy" style="padding:0 2px;margin-bottom:6px;">↥ Importar datos de Pollito (una sola vez)</button><br>'+
     '<button class="link-btn" id="btn-logout" style="padding:0 2px;color:var(--brick);margin-bottom:10px;">Cerrar sesión</button>'+
     '<div class="settings-subtitle">Nombre</div>'+
-    '<div class="frow"><input id="settings-name" value="'+esc(state.settings.appName||'Aienda')+'" placeholder="Ej: María"></div>'+
+    '<div class="frow"><input id="settings-name" class="settings-input" value="'+esc(state.settings.appName||'Aienda')+'" placeholder="Ej: María"></div>'+
     '<div class="settings-subtitle">Avatar</div>'+
     '<div class="avatar-row">'+avatars+'</div>'+
     '<div class="settings-subtitle">Paleta de colores</div>'+
@@ -2065,7 +2069,6 @@ function openSettingsModal(){
     '<button class="close-btn" id="settings-close">Cerrar</button>';
   bg.appendChild(modal); root.appendChild(bg);
 
-  document.getElementById('btn-import-legacy').onclick = importLegacyPollito;
   document.getElementById('btn-logout').onclick = signOut;
 
   document.getElementById('settings-name').onchange = (e)=>{
