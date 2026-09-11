@@ -1,6 +1,6 @@
 {
-  "name": "AIenda",
-  "short_name": "AIenda",
+  "name": "Aienda",
+  "short_name": "Aienda",
   "description": "Tu día a día, en un solo lugar",
   "start_url": "./index.html",
   "display": "standalone",
