@@ -1,0 +1,14 @@
+{
+  "name": "AIenda",
+  "short_name": "AIenda",
+  "description": "Tu día a día, en un solo lugar",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FBF3DE",
+  "theme_color": "#F5B942",
+  "icons": [
+    { "src": "icon-16.png", "sizes": "16x16", "type": "image/png" },
+    { "src": "icon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

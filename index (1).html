@@ -1,0 +1,2234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>AIenda</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F5B942">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --cream:#FBF3DE;
+    --shell:#FFFDF8;
+    --yolk:#F5B942;
+    --yolk-dark:#D99A2B;
+    --moss:#6E8B5A;
+    --moss-light:#E4EEDD;
+    --sky:#6E97A0;
+    --sky-light:#E2EDEE;
+    --brick:#BD5B45;
+    --brick-light:#F7E1DB;
+    --ink:#3A2E22;
+    --ink-soft:#7A6C5D;
+    --line:#EADFC4;
+  }
+  body.dark-mode{
+    --cream:#221D18;
+    --shell:#2D2721;
+    --moss-light:#28352380;
+    --sky-light:#22303580;
+    --brick-light:#3A241E;
+    --ink:#F2E8D8;
+    --ink-soft:#B7A996;
+    --line:#453B31;
+  }
+  body.dark-mode .greet-card{ box-shadow:0 10px 24px -12px rgba(0,0,0,.6); }
+  body.dark-mode .modal-bg{ background:rgba(0,0,0,.65); }
+
+  /* ---------- paletas de color (solo tocan los acentos, no el fondo/oscuro) ---------- */
+  body.theme-cielo{
+    --yolk:#5B9BD5; --yolk-dark:#3E7CB8;
+    --sky:#7E6EA6; --sky-light:#EAE4F1;
+  }
+  body.theme-menta{
+    --yolk:#4FA88A; --yolk-dark:#3B8A70;
+  }
+  body.theme-atardecer{
+    --yolk:#E67E5B; --yolk-dark:#C9613F;
+    --brick:#A8425E; --brick-light:#F5DCE2;
+  }
+  body.theme-lavanda{
+    --yolk:#9B7EBD; --yolk-dark:#7C5FA0;
+  }
+
+  /* ---------- selectores de personalización (configuración) ---------- */
+  .swatch-row{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .swatch{
+    width:44px; height:44px; border-radius:50%; cursor:pointer;
+    border:3px solid transparent; display:flex; align-items:center; justify-content:center;
+    font-size:15px; color:#fff; font-weight:800;
+  }
+  .swatch.selected{ border-color:var(--ink); }
+  .avatar-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .avatar-opt{
+    width:44px; height:44px; border-radius:14px; cursor:pointer; font-size:22px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--shell); border:2px solid var(--line);
+  }
+  .avatar-opt.selected{ border-color:var(--yolk-dark); background:var(--moss-light); }
+  .settings-subtitle{ font-size:12px; font-weight:800; color:var(--ink-soft); margin:14px 0 8px; text-transform:uppercase; letter-spacing:.3px; }
+  .textsize-row{ display:flex; gap:10px; margin-bottom:14px; }
+  .textsize-opt{
+    flex:1; background:var(--shell); border:2px solid var(--line); border-radius:14px;
+    padding:10px 0; cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:600; color:var(--ink);
+  }
+  .textsize-opt.selected{ border-color:var(--yolk-dark); background:var(--moss-light); }
+  .metrica-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--moss-light); color:var(--moss); font-weight:800; font-size:12.5px;
+    border-radius:999px; padding:6px 10px; margin:0 6px 6px 0;
+  }
+  .metrica-chip button{ border:none;background:none;color:var(--moss);font-weight:800;cursor:pointer;padding:0;font-size:13px; }
+
+  .topbar-actions{ margin-left:auto; display:flex; gap:8px; }
+  .dark-toggle-btn, .gear-btn{
+    border:none;background:var(--shell);border:1px solid var(--line);
+    width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer;transition:background .2s;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Nunito',sans-serif;
+    background:var(--cream);
+    color:var(--ink);
+    min-height:100vh;
+    padding-bottom:88px;
+    -webkit-font-smoothing:antialiased;
+    transition:background-color .3s ease, color .3s ease;
+  }
+  h1,h2,h3,.brand{font-family:'Fredoka',sans-serif;}
+  button{font-family:inherit;}
+  ::selection{background:var(--yolk);color:var(--ink);}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    padding:22px 20px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .topbar .chick{font-size:34px;line-height:1;}
+  .topbar .brand{font-size:22px;font-weight:600;color:var(--ink);}
+  .topbar .sub{font-size:13px;color:var(--ink-soft);margin-top:1px;}
+  /* ---------- clima ---------- */
+  .weather-card{
+    display:flex;align-items:center;gap:14px;
+    background:var(--sky-light);border-radius:20px 20px 0 0;padding:16px 18px;margin-top:14px;
+  }
+  .weather-card .w-icon{font-size:40px;}
+  .weather-card .w-temp{font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600;color:#2E4C52;}
+  .weather-card .w-desc{font-size:13px;color:#4C6A70;font-weight:700;}
+  .rain-row{
+    background:var(--shell);border:1px solid var(--sky-light);border-top:none;
+    border-radius:0 0 20px 20px;padding:12px 18px 14px;
+  }
+  .rain-label{font-size:12.5px;font-weight:800;color:var(--sky);margin-bottom:8px;}
+  .rain-chips{display:flex;gap:8px;overflow-x:auto;}
+  .rain-chip{
+    flex:1;min-width:48px;text-align:center;background:var(--sky-light);
+    border-radius:12px;padding:7px 4px;
+  }
+  .rain-chip .rc-hour{font-size:11px;font-weight:800;color:#4C6A70;}
+  .rain-chip .rc-prob{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;color:#2E4C52;margin-top:1px;}
+
+  .wrap{max-width:520px;margin:0 auto;padding:0 16px;}
+
+  /* ---------- greeting card ---------- */
+  .greet-card{
+    background:linear-gradient(155deg,var(--yolk) 0%,#F8C866 100%);
+    border-radius:26px;
+    padding:22px 22px 20px;
+    color:#4A3410;
+    box-shadow:0 10px 24px -12px rgba(217,154,43,.55);
+    margin-bottom:18px;
+  }
+  .greet-card .hello{font-family:'Fredoka',sans-serif;font-size:21px;font-weight:600;margin:0 0 10px;}
+  .verse-text{font-size:15.5px;line-height:1.55;margin:0 0 6px;font-weight:700;}
+  .verse-ref{font-size:12.5px;font-weight:700;opacity:.75;letter-spacing:.2px;}
+
+  /* ---------- alert chips ---------- */
+  .alerts{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
+  .alert{
+    display:flex;align-items:flex-start;gap:10px;
+    border-radius:16px;padding:13px 14px;
+    font-size:14px;font-weight:700;line-height:1.4;
+  }
+  .alert.birthday{background:var(--sky-light);color:#2E4C52;}
+  .alert.payment{background:var(--brick-light);color:#7C3823;}
+  .alert.med{background:var(--moss-light);color:#2E4A22;}
+  .alert .ic{font-size:19px;}
+
+  /* ---------- section headers ---------- */
+  .section-title{
+    font-family:'Fredoka',sans-serif;
+    font-size:17px;font-weight:600;
+    margin:22px 2px 10px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+
+  /* ---------- week nav ---------- */
+  .weeknav{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--shell);border:1px solid var(--line);
+    border-radius:16px;padding:10px 8px;margin-bottom:14px;
+  }
+  .weeknav button{
+    border:none;background:var(--moss-light);color:var(--moss);
+    width:38px;height:38px;border-radius:50%;
+    font-size:17px;cursor:pointer;font-weight:800;
+  }
+  .weeknav button:disabled{opacity:.35;cursor:default;}
+  .weeknav .label{font-weight:800;font-size:14px;text-align:center;flex:1;}
+  .weeknav .label small{display:block;font-weight:600;color:var(--ink-soft);font-size:11.5px;margin-top:1px;}
+
+  /* ---------- day card ---------- */
+  .day-card{
+    background:var(--shell);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:14px 15px 12px;
+    margin-bottom:14px;
+  }
+  .day-card.is-today{border-color:var(--yolk-dark);box-shadow:0 0 0 2px rgba(245,185,66,.35);}
+  .day-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;}
+  .day-head .dname{font-family:'Fredoka',sans-serif;font-weight:600;font-size:16px;}
+  .day-head .ddate{font-size:12px;color:var(--ink-soft);font-weight:700;}
+  .item-row{
+    display:flex;align-items:flex-start;gap:9px;
+    padding:7px 0;border-top:1px solid var(--line);
+  }
+  .item-row:first-of-type{border-top:none;}
+  .chk{
+    width:22px;height:22px;min-width:22px;border-radius:7px;
+    border:2px solid var(--moss);background:#fff;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    font-size:13px;color:#fff;margin-top:1px;
+  }
+  .chk.on{background:var(--moss);}
+  .item-text{flex:1;font-size:14.5px;font-weight:700;line-height:1.4;padding-top:1px;}
+  .item-row.done .item-text{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--moss);}
+  .item-meta{font-size:12px;color:var(--sky);font-weight:800;margin-top:1px;}
+  .item-notes{font-size:12px;color:var(--ink-soft);margin-top:1px;}
+  .tag-cumple{font-size:12px;color:var(--brick);font-weight:800;margin-top:1px;}
+  .del-x{
+    border:none;background:none;color:var(--ink-soft);
+    font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;
+  }
+  .empty-note{font-size:13px;color:var(--ink-soft);padding:6px 0;font-style:italic;}
+
+  .add-row{display:flex;gap:8px;margin-top:9px;}
+  .add-row input{
+    flex:1;border:1.5px solid var(--line);border-radius:12px;
+    padding:9px 11px;font-size:13.5px;font-family:inherit;font-weight:700;
+    background:#FFFEFB;color:var(--ink);
+  }
+  .add-row input:focus{outline:none;border-color:var(--yolk-dark);}
+  .add-btn{
+    border:none;background:var(--moss);color:#fff;
+    width:36px;height:36px;border-radius:11px;font-size:19px;font-weight:800;
+    cursor:pointer;flex-shrink:0;
+  }
+  .mic-btn{
+    border:none;background:var(--sky-light);color:var(--sky);
+    width:36px;height:36px;border-radius:11px;font-size:16px;
+    cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  }
+  .mic-btn.listening{
+    background:var(--brick);color:#fff;
+    animation:mic-pulse 1s ease-in-out infinite;
+  }
+  @keyframes mic-pulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(189,91,69,.5); }
+    50%{ box-shadow:0 0 0 8px rgba(189,91,69,0); }
+  }
+  .link-btn{
+    border:none;background:none;color:var(--sky);font-weight:800;
+    font-size:12.5px;cursor:pointer;padding:6px 2px 0;display:inline-flex;align-items:center;gap:4px;
+  }
+
+  /* ---------- pill buttons ---------- */
+  .pill-btn{
+    border:none;border-radius:999px;padding:10px 16px;
+    font-weight:800;font-size:13.5px;cursor:pointer;
+  }
+  .pill-btn.yolk{background:var(--yolk);color:#4A3410;}
+  .pill-btn.moss{background:var(--moss);color:#fff;}
+  .pill-btn:disabled{opacity:.55;cursor:default;}
+
+  /* ---------- cumpleanos ---------- */
+  .bday-card{
+    background:var(--shell);border:1px solid var(--line);border-radius:18px;
+    padding:13px 15px;margin-bottom:10px;display:flex;align-items:center;gap:12px;
+  }
+  .bday-card .icon{font-size:24px;}
+  .bday-card .info{flex:1;}
+  .bday-card .name{font-weight:800;font-size:14.5px;}
+  .bday-card .date{font-size:12.5px;color:var(--ink-soft);font-weight:700;}
+  .bday-card.today{border-color:var(--brick);background:var(--brick-light);}
+
+  .form-card{
+    background:var(--shell);border:1.5px dashed var(--line);border-radius:18px;
+    padding:14px;margin-bottom:14px;
+  }
+  .form-card .frow{margin-bottom:9px;}
+  .form-card label{font-size:12px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px;}
+  .form-card input, .form-card select, .form-card textarea{
+    width:100%;border:1.5px solid var(--line);border-radius:11px;
+    padding:9px 11px;font-size:14px;font-family:inherit;font-weight:700;color:var(--ink);
+    background:#FFFEFB;
+  }
+  .form-card input:focus,.form-card select:focus,.form-card textarea:focus{outline:none;border-color:var(--yolk-dark);}
+  .form-two{display:flex;gap:9px;}
+  .form-two > div{flex:1;}
+
+  /* ---------- pagos ---------- */
+  .pago-card{
+    background:var(--shell);border:1px solid var(--line);border-radius:20px;
+    padding:16px;margin-bottom:12px;
+  }
+  .pago-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+  .pago-name{font-family:'Fredoka',sans-serif;font-weight:600;font-size:16px;}
+  .pago-day{font-size:12px;color:var(--ink-soft);font-weight:700;}
+  .badge{
+    font-size:11.5px;font-weight:800;padding:5px 10px;border-radius:999px;white-space:nowrap;
+  }
+  .badge.ok{background:var(--moss-light);color:var(--moss);}
+  .badge.soon{background:#FCEBC9;color:#9A6B0E;}
+  .badge.urgent{background:var(--brick-light);color:var(--brick);}
+  .badge.paid{background:var(--moss-light);color:var(--moss);}
+  .pago-bottom{display:flex;justify-content:space-between;align-items:center;}
+  .pago-due{font-size:13px;color:var(--ink-soft);font-weight:700;}
+  .paid-btn{
+    border:1.5px solid var(--moss);background:#fff;color:var(--moss);
+    border-radius:999px;padding:7px 14px;font-weight:800;font-size:12.5px;cursor:pointer;
+  }
+  .paid-btn.is-paid{background:var(--moss);color:#fff;}
+
+  /* ---------- mercado ---------- */
+  .mkt-row{
+    display:flex;align-items:center;gap:10px;
+    background:var(--shell);border:1px solid var(--line);
+    border-radius:14px;padding:11px 13px;margin-bottom:8px;
+  }
+  .mkt-row .item-text{font-size:14.5px;}
+  .mkt-row.done{opacity:.6;}
+  .mkt-row.done .item-text{text-decoration:line-through;text-decoration-color:var(--moss);}
+
+  /* ---------- carrusel horizontal (próxima semana) ---------- */
+  .hscroll{
+    display:flex; gap:12px; overflow-x:auto; padding:2px 2px 10px;
+    scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+  }
+  .hscroll-card{ flex:0 0 82%; scroll-snap-align:start; margin-bottom:0; }
+
+  /* ---------- pestañas de barra ---------- */
+  .tabbar{
+    position:fixed;bottom:0;left:0;right:0;
+    background:var(--shell); border-top:1px solid var(--line);
+    display:flex;justify-content:space-around;
+    padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    z-index:20;
+  }
+  .tab-btn{
+    border:none;background:none;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:6px 6px;border-radius:14px;color:var(--ink-soft);
+    font-size:10.5px;font-weight:800;min-width:58px;position:relative;
+  }
+  .tab-btn .ic{font-size:21px;}
+  .tab-btn.active{color:var(--yolk-dark);background:#FCF0D4;}
+  .tab-dot{
+    position:absolute;top:2px;right:10px;width:9px;height:9px;border-radius:50%;
+    background:var(--brick);border:2px solid var(--shell);
+  }
+
+  /* ---------- configuración ---------- */
+  .settings-group{margin-bottom:6px;}
+  .settings-row{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--shell);border:1px solid var(--line);border-radius:14px;
+    padding:12px 14px;margin-bottom:8px;font-size:14px;font-weight:800;cursor:pointer;
+  }
+  .settings-row input[type="checkbox"]{width:20px;height:20px;accent-color:var(--moss);}
+
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(58,46,34,.45);
+    display:flex;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .modal{
+    background:var(--shell);border-radius:24px 24px 0 0;
+    padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+    width:100%;max-width:520px;max-height:80vh;overflow:auto;
+  }
+  .modal h3{font-size:18px;margin:0 0 12px;}
+  .modal .close-btn{
+    display:block;width:100%;margin-top:16px;padding:12px;border:none;
+    border-radius:14px;background:var(--yolk);color:#4A3410;font-weight:800;font-size:14.5px;cursor:pointer;
+  }
+
+  .hidden{display:none !important;}
+  .tabpanel{padding-bottom:10px;}
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(10px);
+    background:var(--ink);color:#fff;padding:10px 20px;border-radius:999px;
+    font-size:13.5px;font-weight:800;opacity:0;pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;z-index:80;
+    box-shadow:0 8px 20px -8px rgba(0,0,0,.4);white-space:nowrap;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.ok{background:var(--moss);}
+  #toast.error{background:var(--brick);}
+
+  /* ---------- fila pendiente de borrar ---------- */
+  .item-row.pending-del{background:var(--brick-light);border-radius:10px;padding-left:8px;padding-right:4px;}
+  .item-row.pending-del .item-text{color:#7C3823;font-style:italic;}
+
+  /* ---------- pantalla de acceso (cuentas privadas) ---------- */
+  #auth-screen{ padding-top:64px; }
+  #auth-screen .auth-head{ text-align:center; margin-bottom:28px; }
+  #auth-screen .auth-head .chick{ font-size:44px; display:block; margin-bottom:6px; }
+  #auth-screen .auth-head .brand{ font-size:24px; }
+  #auth-screen .auth-head .sub{ font-size:13.5px; color:var(--ink-soft); margin-top:4px; }
+  #auth-screen .form-card{ border-style:solid; }
+  #auth-screen .auth-hint{ font-size:12.5px; color:var(--ink-soft); text-align:center; line-height:1.5; margin:0 6px; }
+  #auth-back-btn{ display:block; margin:12px auto 0; }
+  #auth-code{ letter-spacing:4px; font-size:18px; text-align:center; }
+</style>
+</head>
+<body>
+
+<!-- ================= PANTALLA DE ACCESO (cuentas privadas) ================= -->
+<div id="auth-screen" class="wrap">
+  <div class="auth-head">
+    <span class="chick">🔐</span>
+    <div class="brand">AIenda</div>
+    <div class="sub">Tu día a día, en un solo lugar</div>
+  </div>
+
+  <div id="auth-step-email">
+    <div class="form-card">
+      <div class="frow">
+        <label>Tu correo electrónico</label>
+        <input id="auth-email" type="email" placeholder="tucorreo@ejemplo.com" autocomplete="email" inputmode="email">
+      </div>
+      <button class="pill-btn yolk" id="auth-send-btn" style="width:100%;">Enviarme el enlace de acceso</button>
+    </div>
+    <p class="auth-hint">Te enviamos un correo con un botón para entrar. No necesitas contraseña ni tienes que recordar nada.</p>
+  </div>
+
+  <div id="auth-step-code" class="hidden">
+    <div class="form-card" style="text-align:center;">
+      <div style="font-size:40px;margin-bottom:8px;">📬</div>
+      <p style="font-weight:800;margin:0 0 6px;">Revisa tu correo</p>
+      <p style="font-size:13.5px;color:var(--ink-soft);margin:0;">Te enviamos un enlace a <span id="auth-sent-to" style="font-weight:800;color:var(--ink);"></span>. Ábrelo y toca el botón para entrar. Puede tardar uno o dos minutos.</p>
+    </div>
+    <button class="link-btn" id="auth-back-btn">‹ Usar otro correo</button>
+  </div>
+</div>
+
+<!-- ================= APP (solo visible con sesión iniciada) ================= -->
+<div id="app-root" class="hidden">
+<div class="wrap">
+  <div class="topbar">
+    <div class="chick" id="topbar-avatar">🐥</div>
+    <div>
+      <div class="brand" id="topbar-brand">AIenda</div>
+      <div class="sub">Tu agenda del día a día</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="gear-btn" id="btn-settings" title="Configuración">⚙️</button>
+      <button class="dark-toggle-btn" id="btn-dark-toggle" title="Modo oscuro">🌙</button>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <div id="tab-home" class="tabpanel">
+    <div class="greet-card">
+      <p class="hello" id="greeting-text"></p>
+      <p class="verse-text" id="verse-text"></p>
+      <p class="verse-ref" id="verse-ref"></p>
+    </div>
+    <div class="alerts" id="home-alerts"></div>
+    <div class="section-title">Esta semana</div>
+    <div id="home-thisweek"></div>
+    <div class="section-title">Próxima semana</div>
+    <div id="home-nextweek"></div>
+    <div id="weather-widget"></div>
+  </div>
+
+  <!-- ACTIVIDADES -->
+  <div id="tab-actividades" class="tabpanel hidden">
+    <div class="weeknav">
+      <button id="week-prev">‹</button>
+      <div class="label" id="week-label"></div>
+      <button id="week-next">›</button>
+      <button id="btn-jump-date" title="Ir a un mes">📅</button>
+    </div>
+    <div id="week-days"></div>
+  </div>
+
+  <!-- CUMPLEAÑOS -->
+  <div id="tab-cumple" class="tabpanel hidden">
+    <div class="section-title">
+      Cumpleaños
+      <button class="pill-btn yolk" id="btn-add-bday">+ Agregar</button>
+    </div>
+    <div id="bday-list"></div>
+  </div>
+
+  <!-- PAGOS -->
+  <div id="tab-pagos" class="tabpanel hidden">
+    <div class="section-title">
+      Pagos fijos
+      <button class="pill-btn yolk" id="btn-toggle-edit-pagos">✏️ Editar</button>
+    </div>
+    <div id="pagos-list"></div>
+    <button class="pill-btn yolk hidden" id="btn-add-pago" style="width:100%;margin-top:8px;">+ Agregar pago</button>
+  </div>
+
+  <!-- MERCADO -->
+  <div id="tab-mercado" class="tabpanel hidden">
+    <div class="section-title">🛒 Carrito de compras</div>
+    <div class="day-card">
+      <div id="cart-list"></div>
+      <button class="pill-btn moss" id="mkt-clear-btn" style="margin-top:10px;">Limpiar lista</button>
+    </div>
+
+    <div class="section-title">
+      Lista predeterminada
+      <button class="pill-btn yolk" id="btn-toggle-edit-mercado">✏️ Editar</button>
+    </div>
+    <div class="day-card">
+      <div id="default-list"></div>
+      <div class="add-row hidden" id="mkt-add-row" style="margin-top:8px;">
+        <input id="mkt-input" placeholder="Añadir producto a la lista...">
+        <span id="mkt-mic-holder"></span>
+        <button class="add-btn" id="mkt-add-btn">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEDICAMENTOS -->
+  <div id="tab-medicamentos" class="tabpanel hidden">
+    <div class="section-title">💊 Hoy</div>
+    <div class="day-card">
+      <div id="meds-today-list"></div>
+    </div>
+
+    <div class="section-title">
+      Mis medicamentos
+      <button class="pill-btn yolk" id="btn-add-med">+ Agregar</button>
+    </div>
+    <div id="meds-list"></div>
+  </div>
+
+  <!-- SIGNOS VITALES -->
+  <div id="tab-signos" class="tabpanel hidden">
+    <div class="section-title">🩺 Nuevo registro</div>
+    <div class="form-card" style="border-style:solid;">
+      <div class="form-two">
+        <div class="frow"><label>Fecha</label><input id="sv-fecha" type="date"></div>
+        <div class="frow"><label>Hora</label><input id="sv-hora" type="time"></div>
+      </div>
+      <div class="form-two">
+        <div class="frow"><label>Sistólica</label><input id="sv-sistolica" type="number" placeholder="Ej: 120"></div>
+        <div class="frow"><label>Diastólica</label><input id="sv-diastolica" type="number" placeholder="Ej: 80"></div>
+      </div>
+      <div class="form-two">
+        <div class="frow"><label>Frecuencia cardíaca (lpm)</label><input id="sv-fc" type="number" placeholder="Ej: 72"></div>
+        <div class="frow"><label>Glicemia (mg/dL)</label><input id="sv-glicemia" type="number" placeholder="Ej: 100"></div>
+      </div>
+      <div class="frow"><label>Peso (kg)</label><input id="sv-peso" type="number" step="0.1" placeholder="Ej: 68.5"></div>
+      <div id="sv-otros-fields"></div>
+      <div id="sv-metricas-chips" style="margin-bottom:8px;"></div>
+      <button class="link-btn" id="btn-add-metrica" style="padding:0;margin-bottom:10px;">+ Agregar otra métrica (ej: TSH, colesterol...)</button>
+      <button class="pill-btn yolk" id="sv-save" style="width:100%;">Guardar registro</button>
+    </div>
+
+    <button class="pill-btn moss" id="btn-trends" style="width:100%;margin-bottom:14px;">📈 Ver tendencias</button>
+
+    <div class="section-title">
+      Historial
+      <button class="pill-btn yolk" id="btn-export-signos">📄 Exportar</button>
+    </div>
+    <div id="signos-list"></div>
+  </div>
+</div>
+
+<div class="tabbar">
+  <button class="tab-btn active" data-tab="home"><span class="ic">🏠</span>Inicio</button>
+  <button class="tab-btn" data-tab="actividades"><span class="ic">✅</span>Actividades</button>
+  <button class="tab-btn" data-tab="cumple"><span class="ic">🎂</span>Cumpleaños<span class="tab-dot hidden" id="dot-cumple"></span></button>
+  <button class="tab-btn" data-tab="pagos"><span class="ic">💳</span>Pagos<span class="tab-dot hidden" id="dot-pagos"></span></button>
+  <button class="tab-btn" data-tab="mercado"><span class="ic">🛒</span>Mercado</button>
+  <button class="tab-btn" data-tab="medicamentos"><span class="ic">💊</span>Medic.<span class="tab-dot hidden" id="dot-medicamentos"></span></button>
+  <button class="tab-btn" data-tab="signos"><span class="ic">🩺</span>Signos</button>
+</div>
+
+<div id="modal-root"></div>
+</div><!-- /app-root -->
+
+<script>
+/* ================= DATA ================= */
+const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const MONTH_NAMES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+const VERSES = [
+  {t:'Todo lo puedo en Cristo que me fortalece.', r:'Filipenses 4:13'},
+  {t:'El Señor es mi pastor, nada me faltará.', r:'Salmos 23:1'},
+  {t:'Encomienda al Señor tu camino, y confía en él.', r:'Salmos 37:5'},
+  {t:'No temas, porque yo estoy contigo.', r:'Isaías 41:10'},
+  {t:'Este es el día que hizo el Señor; nos gozaremos y alegraremos en él.', r:'Salmos 118:24'},
+  {t:'Jehová es mi luz y mi salvación; ¿de quién temeré?', r:'Salmos 27:1'},
+  {t:'Echa sobre el Señor tu carga, y él te sustentará.', r:'Salmos 55:22'},
+  {t:'El gozo de Jehová es vuestra fuerza.', r:'Nehemías 8:10'},
+  {t:'Dad gracias en todo, porque esta es la voluntad de Dios.', r:'1 Tesalonicenses 5:18'},
+  {t:'Bienaventurados los de limpio corazón, porque ellos verán a Dios.', r:'Mateo 5:8'},
+  {t:'Todo tiene su tiempo, y todo lo que se quiere debajo del cielo tiene su hora.', r:'Eclesiastés 3:1'},
+  {t:'El amor es sufrido, es benigno.', r:'1 Corintios 13:4'},
+  {t:'No os afanéis por el día de mañana.', r:'Mateo 6:34'},
+  {t:'Fortaleceos en el Señor y en el poder de su fuerza.', r:'Efesios 6:10'},
+  {t:'Buscad primeramente el reino de Dios.', r:'Mateo 6:33'},
+  {t:'Cantad alegres a Dios, habitantes de toda la tierra.', r:'Salmos 100:1'},
+  {t:'El corazón alegre constituye buen remedio.', r:'Proverbios 17:22'},
+  {t:'Los que esperan a Jehová tendrán nuevas fuerzas.', r:'Isaías 40:31'},
+  {t:'Amarás a tu prójimo como a ti mismo.', r:'Marcos 12:31'},
+  {t:'Dios es amor.', r:'1 Juan 4:8'},
+  {t:'En paz me acostaré, y asimismo dormiré.', r:'Salmos 4:8'},
+  {t:'El que confía en Jehová tiene seguridad.', r:'Proverbios 29:25'},
+  {t:'Mejor es la sabiduría que las armas de guerra.', r:'Eclesiastés 9:18'},
+  {t:'Gustad, y ved que es bueno Jehová.', r:'Salmos 34:8'},
+  {t:'¿No sabéis que sois templo de Dios?', r:'1 Corintios 3:16'},
+  {t:'Vosotros sois la luz del mundo.', r:'Mateo 5:14'},
+  {t:'Confía en Jehová de todo tu corazón.', r:'Proverbios 3:5'},
+  {t:'Alégrense los cielos, y gócese la tierra.', r:'Salmos 96:11'},
+  {t:'Con Dios haremos proezas.', r:'Salmos 108:13'},
+  {t:'Tu palabra es lámpara a mis pies.', r:'Salmos 119:105'},
+];
+
+const THEMES = [
+  {key:'clasico',    label:'Clásico',    color:'#F5B942'},
+  {key:'cielo',      label:'Cielo',      color:'#5B9BD5'},
+  {key:'menta',      label:'Menta',      color:'#4FA88A'},
+  {key:'atardecer',  label:'Atardecer',  color:'#E67E5B'},
+  {key:'lavanda',    label:'Lavanda',    color:'#9B7EBD'},
+];
+const AVATAR_OPTIONS = ['✨','🐥','🐶','🐱','🐰','🦊','🐻','🦁','🐞','🦋','🌻','🧡','⭐','🍀','😊'];
+
+const TAB_DEFS = [
+  {key:'actividades',  label:'Actividades',   icon:'✅'},
+  {key:'cumple',       label:'Cumpleaños',    icon:'🎂'},
+  {key:'pagos',        label:'Pagos',         icon:'💳'},
+  {key:'mercado',      label:'Mercado',       icon:'🛒'},
+  {key:'medicamentos', label:'Medicamentos',  icon:'💊'},
+  {key:'signos',       label:'Signos vitales',icon:'🩺'},
+];
+
+// Estado "de fábrica" para una cuenta nueva. Cada usuario arranca en blanco;
+// nada de lo que ve un usuario viene precargado con datos de otro.
+function blankState(){
+  return {
+    templates:{Lunes:[],Martes:[],Miércoles:[],Jueves:[],Viernes:[],Sábado:[],Domingo:[]},
+    activityStatus:{},   // { 'YYYY-MM-DD': { itemId: true } }
+    compromisos:[],      // { id, date:'YYYY-MM-DD', nombre, hora, notas }
+    cumpleanos:[],        // { id, nombre, dia, mes, notas }
+    pagos:[],              // { id, nombre, dia } — el usuario agrega los suyos
+    pagosStatus:{},       // { pagoId: { 'YYYY-MM': true } }
+    mercadoDefault:[],     // { id, nombre, enCarrito, comprado } — el usuario arma su propia lista
+    medicamentos:[],      // { id, nombre, dosis, horarios:['08:00','14:00'] }
+    medsStatus:{},         // { 'YYYY-MM-DD': { 'medId|hora': true } }
+    signosVitales:[],      // { id, fecha:'YYYY-MM-DD', hora:'HH:MM', sistolica, diastolica, fc, glicemia, peso, otros:{metricaId:valor} }
+    signosMetricas:[],      // { id, nombre, unidad } — métricas personalizadas adicionales (ej: TSH, Colesterol)
+    settings:{
+      tabs:{ actividades:true, cumple:true, pagos:true, mercado:true, medicamentos:false, signos:false }, // qué pestañas se muestran (el contenido nunca se borra al desactivar)
+      weatherEnabled:true,
+      micEnabled:false, // dictado por voz — apagado por defecto, se activa desde Configuración
+      pushEnabled:false, // notificaciones push — apagadas por defecto, se activan desde Configuración
+      theme:'clasico',
+      avatar:'✨',
+      appName:'AIenda',
+      textScale:1 // 1 = tamaño estándar; se puede aumentar desde Configuración
+    }
+  };
+}
+
+let state = blankState();
+
+let activitiesWeekStart = getMonday(new Date()); // referencia de semana para la pestaña Actividades (independiente de "hoy")
+let editModePagos = false;
+let editModeMercado = false;
+let darkOverride = null; // null = automático según la hora; true/false = forzado a mano por el botón
+
+/* ================= MODO OSCURO (automático 7pm–6am, con botón para forzarlo) ================= */
+function isNightTime(){
+  const h = new Date().getHours();
+  return h>=19 || h<6;
+}
+function applyDarkMode(){
+  const dark = darkOverride!==null ? darkOverride : isNightTime();
+  document.body.classList.toggle('dark-mode', dark);
+  const btn = document.getElementById('btn-dark-toggle');
+  if(btn) btn.textContent = dark ? '☀️' : '🌙';
+}
+let saveTimer = null;
+
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+/* ================= DICTADO POR VOZ (Web Speech API — gratis, sin API key) ================= */
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+function makeMicButton(inputEl){
+  const btn = document.createElement('button');
+  btn.type='button';
+  btn.className='mic-btn'+(state.settings.micEnabled ? '' : ' hidden');
+  btn.textContent='🎤';
+  if(!SpeechRec){
+    btn.style.display='none'; // el navegador no soporta dictado; el campo sigue funcionando a mano
+    return btn;
+  }
+  btn.onclick = ()=>{
+    const rec = new SpeechRec();
+    rec.lang = 'es-CO';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    btn.classList.add('listening'); btn.textContent='●';
+    rec.onresult = (e)=>{
+      const texto = e.results[0][0].transcript;
+      inputEl.value = inputEl.value.trim() ? inputEl.value.trim()+' '+texto : texto;
+      inputEl.focus();
+    };
+    rec.onerror = ()=>{ /* si falla o deniegan el micrófono, no pasa nada, ella escribe a mano */ };
+    rec.onend = ()=>{ btn.classList.remove('listening'); btn.textContent='🎤'; };
+    try{ rec.start(); }catch(e){ btn.classList.remove('listening'); btn.textContent='🎤'; }
+  };
+  return btn;
+}
+
+/* ================= SUPABASE ================= */
+// Mismo proyecto de Supabase que ya usabas con Pollito — no hay que crear uno nuevo.
+const SUPABASE_URL = 'https://hymclqcdpplamdinfrhb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_-PXExRRGp6CTYxgGd5ftBA_aIHY_04D';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null; // se llena al iniciar sesión; nada se lee/guarda sin esto
+
+// Cada usuario tiene su propia fila en aienda_data, identificada por su user_id
+// (viene de Supabase Auth). Las reglas de seguridad (RLS) impiden que un usuario
+// pueda leer o escribir la fila de otro, aunque lo intentara desde fuera de la app.
+async function loadState(){
+  if(!currentUser) return;
+  try{
+    const { data, error } = await sb.from('aienda_data').select('data').eq('user_id', currentUser.id).maybeSingle();
+    if(error) throw error;
+    if(data && data.data){
+      state = Object.assign(blankState(), data.data);
+    }
+  }catch(e){ console.error('No se pudo cargar desde Supabase', e); }
+}
+
+function saveState(){
+  if(!currentUser) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      const { error } = await sb.from('aienda_data').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
+      if(error) throw error;
+    }catch(e){
+      console.error('No se pudo guardar en Supabase', e);
+      showToast('No se pudo guardar. Revisa tu conexión.', 'error');
+    }
+  }, 400);
+}
+
+/* ================= ACCESO: login por código de correo (sin contraseña) ================= */
+let pendingEmail = null;
+
+function showAuthScreen(){
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app-root').classList.add('hidden');
+}
+function hideAuthScreen(){
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-root').classList.remove('hidden');
+}
+function resetAuthForm(){
+  document.getElementById('auth-step-code').classList.add('hidden');
+  document.getElementById('auth-step-email').classList.remove('hidden');
+  document.getElementById('auth-email').value='';
+  pendingEmail = null;
+}
+
+async function sendCode(){
+  const email = document.getElementById('auth-email').value.trim();
+  if(!email){ showToast('Escribe tu correo', 'error'); return; }
+  const btn = document.getElementById('auth-send-btn');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:true, emailRedirectTo: window.location.href } });
+  btn.disabled = false; btn.textContent = 'Enviarme el enlace de acceso';
+  if(error){ showToast('No se pudo enviar el correo', 'error'); console.error(error); return; }
+  pendingEmail = email;
+  document.getElementById('auth-sent-to').textContent = email;
+  document.getElementById('auth-step-email').classList.add('hidden');
+  document.getElementById('auth-step-code').classList.remove('hidden');
+  showToast('Correo enviado', 'ok');
+}
+
+async function verifyCode(){
+  const code = document.getElementById('auth-code').value.trim();
+  if(!code){ showToast('Escribe el código', 'error'); return; }
+  const btn = document.getElementById('auth-verify-btn');
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  const { data, error } = await sb.auth.verifyOtp({ email: pendingEmail, token: code, type:'email' });
+  btn.disabled = false; btn.textContent = 'Entrar';
+  if(error){ showToast('Código incorrecto o vencido', 'error'); return; }
+  await onLoggedIn(data.session.user);
+}
+
+async function onLoggedIn(user){
+  currentUser = user;
+  state = blankState();
+  await loadState();
+  hideAuthScreen();
+  applyDarkMode(); applyPersonalization(); applyTextScale();
+  applyTabVisibility(); applyWeatherVisibility(); applyMicVisibility();
+  renderAll(); renderSvOtrosFields(); renderMetricasChips();
+  loadWeather();
+  refreshAccountInfo();
+}
+
+async function signOut(){
+  await sb.auth.signOut();
+  currentUser = null;
+  document.getElementById('modal-root').innerHTML = '';
+  resetAuthForm();
+  showAuthScreen();
+}
+
+/* ================= IMPORTAR DATOS DE LA VERSIÓN ANTERIOR (Pollito) ================= */
+// Un solo botón, disponible para cualquier cuenta, por si alguien viene de la app
+// anterior (una sola fila compartida) y quiere traerse su información una vez.
+async function importLegacyPollito(){
+  const ok = confirm('Esto va a reemplazar los datos que tengas guardados ahora mismo con los de la versión anterior (Pollito). ¿Continuar?');
+  if(!ok) return;
+  try{
+    const { data, error } = await sb.from('pollito_data').select('data').eq('id','pollito-main').maybeSingle();
+    if(error) throw error;
+    if(!data || !data.data){ showToast('No se encontraron datos de Pollito', 'error'); return; }
+    state = Object.assign(blankState(), data.data);
+    saveState();
+    applyPersonalization(); applyTabVisibility(); applyWeatherVisibility(); applyMicVisibility(); applyTextScale();
+    renderAll(); renderSvOtrosFields(); renderMetricasChips();
+    showToast('Datos importados', 'ok');
+    document.getElementById('modal-root').innerHTML='';
+  }catch(e){
+    console.error(e);
+    showToast('No se pudo importar', 'error');
+  }
+}
+
+/* ================= TOAST (avisos rápidos) ================= */
+let toastTimer=null;
+function showToast(msg, kind){
+  let el = document.getElementById('toast');
+  if(!el){
+    el = document.createElement('div');
+    el.id='toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast show '+(kind||'ok');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.classList.remove('show'); }, kind==='error'?4000:1300);
+}
+
+/* ================= BORRAR CON "DESHACER" ================= */
+const pendingDeletes = {}; // id -> { timeoutId }
+function scheduleDelete(id, label, onCommit){
+  if(pendingDeletes[id]) return;
+  const timeoutId = setTimeout(()=>{
+    delete pendingDeletes[id];
+    onCommit();
+    renderAll();
+  }, 4000);
+  pendingDeletes[id] = { timeoutId };
+  renderAll();
+}
+function undoDelete(id){
+  const pd = pendingDeletes[id];
+  if(!pd) return;
+  clearTimeout(pd.timeoutId);
+  delete pendingDeletes[id];
+  renderAll();
+}
+function pendingDeleteRow(id, label){
+  const row=document.createElement('div');
+  row.className='item-row pending-del';
+  row.innerHTML = '<div class="item-text" style="flex:1;">Eliminando "'+esc(label)+'"…</div>';
+  const undo=document.createElement('button');
+  undo.className='link-btn'; undo.style.padding='0'; undo.textContent='Deshacer';
+  undo.onclick=()=>undoDelete(id);
+  row.appendChild(undo);
+  return row;
+}
+
+/* ================= DATE HELPERS ================= */
+function pad(n){ return String(n).padStart(2,'0'); }
+function dateKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+function sameDate(a,b){ return dateKey(a)===dateKey(b); }
+
+function getMonday(d){
+  const x = startOfDay(d);
+  const day = (x.getDay()+6)%7; // Mon=0
+  x.setDate(x.getDate()-day);
+  return x;
+}
+function getWeekDates(offset){
+  const monday = getMonday(new Date());
+  monday.setDate(monday.getDate()+offset*7);
+  const days=[];
+  for(let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); days.push(d); }
+  return days;
+}
+function getWeekDatesFrom(monday){
+  const days=[];
+  for(let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); days.push(d); }
+  return days;
+}
+
+/* ================= GREETING + VERSE ================= */
+function renderGreeting(){
+  const h = new Date().getHours();
+  const nombre = state.settings.appName || 'AIenda';
+  let saludo = 'Buenos días, '+nombre;
+  if(h>=12 && h<19) saludo='Buenas tardes, '+nombre;
+  else if(h>=19 || h<5) saludo='Buenas noches, '+nombre;
+  document.getElementById('greeting-text').textContent = saludo;
+
+  const dayOfYear = Math.floor((startOfDay(new Date()) - new Date(new Date().getFullYear(),0,0)) / 86400000);
+  const v = VERSES[dayOfYear % VERSES.length];
+  document.getElementById('verse-text').textContent = '“'+v.t+'”';
+  document.getElementById('verse-ref').textContent = v.r;
+}
+
+/* ================= PERSONALIZACIÓN: tema, avatar, nombre ================= */
+function applyPersonalization(){
+  THEMES.forEach(t=> document.body.classList.remove('theme-'+t.key));
+  if(state.settings.theme && state.settings.theme!=='clasico'){
+    document.body.classList.add('theme-'+state.settings.theme);
+  }
+  document.getElementById('topbar-avatar').textContent = state.settings.avatar || '✨';
+  document.getElementById('topbar-brand').textContent = state.settings.appName || 'AIenda';
+}
+
+function applyTextScale(){
+  document.body.style.zoom = state.settings.textScale || 1;
+}
+
+/* ================= CUMPLEAÑOS HELPERS ================= */
+function bdaysOn(d){
+  return state.cumpleanos.filter(b=> b.dia===d.getDate() && b.mes===(d.getMonth()+1));
+}
+function bdaysInWeek(dates){
+  const out=[];
+  dates.forEach(d=>{ bdaysOn(d).forEach(b=> out.push({b,d})); });
+  return out;
+}
+
+/* ================= PAGOS HELPERS ================= */
+function lastDayOfMonth(y,m){ return new Date(y, m+1, 0).getDate(); } // m es 0-indexado
+function dueDateFor(y, m, dia){
+  const clamped = Math.min(dia, lastDayOfMonth(y,m));
+  return new Date(y, m, clamped);
+}
+function pagoInfo(pago, today){
+  const y = today.getFullYear(), m = today.getMonth();
+  let due = dueDateFor(y, m, pago.dia);
+  if(startOfDay(due) < startOfDay(today)) due = dueDateFor(y, m+1, pago.dia);
+  const key = due.getFullYear()+'-'+pad(due.getMonth()+1);
+  const paid = !!(state.pagosStatus[pago.id] && state.pagosStatus[pago.id][key]);
+  const diffDays = Math.round((startOfDay(due) - startOfDay(today))/86400000);
+  return {due, key, paid, diffDays};
+}
+function pagoNeedsAlert(info){
+  if(info.paid) return false;
+  if(info.diffDays<0) return false;
+  return info.diffDays===3 || info.diffDays===0;
+}
+
+/* ================= RENDER: ALERTS (home) ================= */
+function renderAlerts(){
+  const today = new Date();
+  const box = document.getElementById('home-alerts');
+  box.innerHTML='';
+  let hasCumpleAlert=false, hasPagoAlert=false;
+
+  const todays = bdaysOn(today);
+  todays.forEach(b=>{
+    hasCumpleAlert=true;
+    const div=document.createElement('div');
+    div.className='alert birthday';
+    div.innerHTML='<span class="ic">🎂</span><span>¡Hoy es el cumpleaños de '+esc(b.nombre)+'!</span>';
+    box.appendChild(div);
+  });
+
+  if(today.getDay()===1){ // lunes
+    const dates = getWeekDates(0);
+    const upcoming = bdaysInWeek(dates).filter(x=>!sameDate(x.d,today));
+    if(upcoming.length){
+      hasCumpleAlert=true;
+      const names = upcoming.map(x=>x.b.nombre+' ('+x.d.getDate()+' de '+MONTH_NAMES[x.d.getMonth()]+')').join(', ');
+      const div=document.createElement('div');
+      div.className='alert birthday';
+      div.innerHTML='<span class="ic">🎂</span><span>Esta semana hay cumpleaños: '+esc(names)+'</span>';
+      box.appendChild(div);
+    }
+  }
+
+  const urgentPagos = state.pagos.filter(p=>pagoNeedsAlert(pagoInfo(p, today)));
+  if(urgentPagos.length){
+    hasPagoAlert=true;
+    const names = urgentPagos.map(p=>{
+      const i=pagoInfo(p,today);
+      return p.nombre+' (vence '+ (i.diffDays===0?'hoy':'en '+i.diffDays+' días') +')';
+    }).join(', ');
+    const div=document.createElement('div');
+    div.className='alert payment';
+    div.innerHTML='<span class="ic">💳</span><span>Pagos próximos: '+esc(names)+'</span>';
+    box.appendChild(div);
+  }
+
+  let hasMedAlert=false;
+  if(state.settings.tabs.medicamentos){
+    const nowStr = pad(today.getHours())+':'+pad(today.getMinutes());
+    const key = dateKey(today);
+    const statusMap = state.medsStatus[key] || {};
+    const pendientes = buildTodayMedItems().filter(it=> it.hora<=nowStr && !statusMap[it.statusKey]);
+    if(pendientes.length){
+      hasMedAlert=true;
+      const names = pendientes.map(it=> it.nombre+' ('+it.hora+')').join(', ');
+      const div=document.createElement('div');
+      div.className='alert med';
+      div.innerHTML='<span class="ic">💊</span><span>Medicamentos pendientes: '+esc(names)+'</span>';
+      box.appendChild(div);
+    }
+  }
+
+  document.getElementById('dot-cumple').classList.toggle('hidden', !hasCumpleAlert);
+  document.getElementById('dot-pagos').classList.toggle('hidden', !hasPagoAlert);
+  const dotMed = document.getElementById('dot-medicamentos');
+  if(dotMed) dotMed.classList.toggle('hidden', !hasMedAlert);
+}
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+/* Build unified list of items for a given date: template items + compromisos (ordenados por hora) */
+function buildDayItems(date){
+  const dname = DAY_NAMES[(date.getDay()+6)%7];
+  const key = dateKey(date);
+  const out=[];
+  (state.templates[dname]||[]).forEach(t=> out.push({type:'template', id:t.id, texto:t.texto}));
+  const dayCompromisos = state.compromisos.filter(c=>c.date===key).slice().sort((a,b)=>{
+    if(!a.hora && !b.hora) return 0;
+    if(!a.hora) return 1;   // sin hora, al final
+    if(!b.hora) return -1;
+    return a.hora.localeCompare(b.hora);
+  });
+  dayCompromisos.forEach(c=> out.push({type:'compromiso', id:c.id, texto:c.nombre, hora:c.hora, notas:c.notas}));
+  return out;
+}
+
+function renderItemRow(it, dayKey){
+  if(pendingDeletes[it.id]) return pendingDeleteRow(it.id, it.texto);
+
+  const row = document.createElement('div');
+  const statusMap = state.activityStatus[dayKey]||{};
+  const done = !!statusMap[it.id];
+  row.className='item-row'+(done?' done':'');
+
+  const chk = document.createElement('div');
+  chk.className='chk'+(done?' on':'');
+  chk.textContent = done?'✓':'';
+  chk.onclick = ()=>{
+    if(!state.activityStatus[dayKey]) state.activityStatus[dayKey]={};
+    state.activityStatus[dayKey][it.id] = !state.activityStatus[dayKey][it.id];
+    saveState(); renderAll();
+  };
+  row.appendChild(chk);
+
+  const mid = document.createElement('div');
+  mid.style.flex='1';
+  let html = '<div class="item-text">'+esc(it.texto)+'</div>';
+  if(it.hora) html += '<div class="item-meta">🕒 '+esc(it.hora)+'</div>';
+  if(it.notas) html += '<div class="item-notes">'+esc(it.notas)+'</div>';
+  mid.innerHTML = html;
+  row.appendChild(mid);
+
+  if(it.type==='compromiso'){
+    const edit = document.createElement('button');
+    edit.className='del-x'; edit.textContent='✏️';
+    edit.onclick = ()=>{
+      const c = state.compromisos.find(x=>x.id===it.id);
+      openCompromisoModal(dayKey, c);
+    };
+    row.appendChild(edit);
+  }
+
+  if(it.type==='template' || it.type==='compromiso'){
+    const del = document.createElement('button');
+    del.className='del-x'; del.textContent='✕';
+    del.onclick = ()=>{
+      scheduleDelete(it.id, it.texto, ()=>{
+        if(it.type==='template'){
+          Object.keys(state.templates).forEach(dn=>{
+            state.templates[dn] = state.templates[dn].filter(t=>t.id!==it.id);
+          });
+        } else {
+          state.compromisos = state.compromisos.filter(c=>c.id!==it.id);
+        }
+        saveState();
+      });
+    };
+    row.appendChild(del);
+  }
+  return row;
+}
+
+/* ================= RENDER: ACTIVIDADES (semana) ================= */
+function renderWeekLabel(dates){
+  const first=dates[0], last=dates[6];
+  const lbl = document.getElementById('week-label');
+  const sameMonth = first.getMonth()===last.getMonth();
+  const txt = sameMonth
+    ? first.getDate()+' – '+last.getDate()+' de '+MONTH_NAMES[first.getMonth()]
+    : first.getDate()+' de '+MONTH_NAMES[first.getMonth()]+' – '+last.getDate()+' de '+MONTH_NAMES[last.getMonth()];
+  const weeksDiff = Math.round((activitiesWeekStart - getMonday(new Date())) / (7*86400000));
+  lbl.innerHTML = txt + '<small>'+(weeksDiff===0?'Semana actual':(weeksDiff>0?'En '+weeksDiff+' semana(s)':'Hace '+Math.abs(weeksDiff)+' semana(s)'))+'</small>';
+}
+
+function renderWeek(){
+  const dates = getWeekDatesFrom(activitiesWeekStart);
+  renderWeekLabel(dates);
+  document.getElementById('week-prev').disabled = false;
+  const holder = document.getElementById('week-days');
+  holder.innerHTML='';
+  const today = new Date();
+
+  dates.forEach(d=>{
+    const dname = DAY_NAMES[(d.getDay()+6)%7];
+    const key = dateKey(d);
+    const isToday = sameDate(d, today);
+
+    const card = document.createElement('div');
+    card.className='day-card'+(isToday?' is-today':'');
+
+    const head = document.createElement('div');
+    head.className='day-head';
+    head.innerHTML = '<span class="dname">'+dname+'</span><span class="ddate">'+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</span>';
+    card.appendChild(head);
+
+    const bdays = bdaysOn(d);
+    bdays.forEach(b=>{
+      const tag=document.createElement('div');
+      tag.className='tag-cumple';
+      tag.textContent='🎂 Cumpleaños de '+b.nombre;
+      card.appendChild(tag);
+    });
+
+    const items = buildDayItems(d);
+    if(items.length===0 && bdays.length===0){
+      const p=document.createElement('div'); p.className='empty-note'; p.textContent='Sin actividades. Toca + para agregar.';
+      card.appendChild(p);
+    } else {
+      items.forEach(it=> card.appendChild(renderItemRow(it,key)));
+    }
+
+    // add activity (template) row
+    const addAct = document.createElement('div');
+    addAct.className='add-row';
+    const inpAct = document.createElement('input');
+    inpAct.placeholder='Nueva actividad de '+dname+'...';
+    const btnAct = document.createElement('button');
+    btnAct.className='add-btn'; btnAct.textContent='+';
+    btnAct.onclick = ()=>{
+      const val = inpAct.value.trim();
+      if(!val) return;
+      state.templates[dname].push({id:uid(), texto:val});
+      inpAct.value='';
+      saveState(); renderAll();
+    };
+    inpAct.addEventListener('keydown', e=>{ if(e.key==='Enter') btnAct.click(); });
+    addAct.appendChild(inpAct); addAct.appendChild(makeMicButton(inpAct)); addAct.appendChild(btnAct);
+    card.appendChild(addAct);
+
+    // add compromiso link
+    const linkBtn = document.createElement('button');
+    linkBtn.className='link-btn';
+    linkBtn.textContent='📅 Agregar compromiso con hora';
+    linkBtn.onclick = ()=> openCompromisoModal(key);
+    card.appendChild(linkBtn);
+
+    holder.appendChild(card);
+  });
+}
+
+function openCompromisoModal(dateKeyStr, existing){
+  const d = new Date(dateKeyStr+'T00:00:00');
+  const dname = DAY_NAMES[(d.getDay()+6)%7];
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>'+(existing?'Editar compromiso':'Nuevo compromiso')+' — '+dname+' '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
+        '<div style="flex:1;"><label>Nombre del compromiso</label><input id="cf-nombre" placeholder="Ej: Cita médica" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+        '<span id="cf-mic-holder"></span>'+
+      '</div>'+
+      '<div class="frow"><label>Hora</label><input id="cf-hora" type="time" value="'+(existing&&existing.hora?existing.hora:'')+'"></div>'+
+      '<div class="frow"><label>Notas (opcional)</label><textarea id="cf-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
+    '</div>'+
+    '<button class="close-btn" id="cf-save">Guardar compromiso</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('cf-mic-holder').appendChild(makeMicButton(document.getElementById('cf-nombre')));
+
+  document.getElementById('cf-save').onclick = ()=>{
+    const nombre = document.getElementById('cf-nombre').value.trim();
+    if(!nombre) return;
+    const hora = document.getElementById('cf-hora').value;
+    const notas = document.getElementById('cf-notas').value.trim();
+    if(existing){
+      existing.nombre=nombre; existing.hora=hora; existing.notas=notas;
+    } else {
+      state.compromisos.push({id:uid(), date:dateKeyStr, nombre, hora, notas});
+    }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
+/* ================= RENDER: CUMPLEAÑOS ================= */
+function openBdayModal(existing){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>'+(existing?'Editar cumpleaños':'Nuevo cumpleaños')+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
+        '<div style="flex:1;"><label>Nombre</label><input id="bf-nombre" placeholder="Nombre" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+        '<span id="bf-mic-holder"></span>'+
+      '</div>'+
+      '<div class="form-two">'+
+        '<div class="frow"><label>Día</label><input id="bf-dia" type="number" min="1" max="31" placeholder="Día" value="'+(existing?existing.dia:'')+'"></div>'+
+        '<div class="frow"><label>Mes</label>'+
+          '<select id="bf-mes">'+MONTH_NAMES.map((m,i)=>'<option value="'+(i+1)+'"'+(existing&&existing.mes===(i+1)?' selected':'')+'>'+m+'</option>').join('')+'</select>'+
+        '</div>'+
+      '</div>'+
+      '<div class="frow"><label>Notas (opcional)</label><input id="bf-notas" placeholder="Ej: regalo, restaurante..." value="'+(existing&&existing.notas?esc(existing.notas):'')+'"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="bf-save">Guardar cumpleaños</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('bf-mic-holder').appendChild(makeMicButton(document.getElementById('bf-nombre')));
+  document.getElementById('bf-save').onclick = ()=>{
+    const nombre = document.getElementById('bf-nombre').value.trim();
+    const dia = parseInt(document.getElementById('bf-dia').value,10);
+    const mes = parseInt(document.getElementById('bf-mes').value,10);
+    const notas = document.getElementById('bf-notas').value.trim();
+    if(!nombre || !dia || dia<1 || dia>31) return;
+    if(existing){
+      existing.nombre=nombre; existing.dia=dia; existing.mes=mes; existing.notas=notas;
+    } else {
+      state.cumpleanos.push({id:uid(), nombre, dia, mes, notas});
+    }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
+function renderBdayList(){
+  const list = document.getElementById('bday-list');
+  list.innerHTML='';
+  const today = new Date();
+  const sorted = [...state.cumpleanos].sort((a,b)=>{
+    const da = ((a.mes-1)*31+a.dia), db=((b.mes-1)*31+b.dia);
+    return da-db;
+  });
+  if(sorted.length===0){
+    list.innerHTML = '<div class="empty-note">Aún no hay cumpleaños agregados.</div>';
+    return;
+  }
+  sorted.forEach(b=>{
+    if(pendingDeletes[b.id]){ list.appendChild(pendingDeleteRow(b.id, b.nombre)); return; }
+    const isToday = b.dia===today.getDate() && b.mes===(today.getMonth()+1);
+    const card = document.createElement('div');
+    card.className='bday-card'+(isToday?' today':'');
+    card.innerHTML = '<div class="icon">🎂</div>'+
+      '<div class="info"><div class="name">'+esc(b.nombre)+'</div>'+
+      '<div class="date">'+b.dia+' de '+MONTH_NAMES[b.mes-1]+(b.notas?' · '+esc(b.notas):'')+'</div></div>';
+    const edit = document.createElement('button');
+    edit.className='del-x'; edit.textContent='✏️';
+    edit.onclick=()=> openBdayModal(b);
+    card.appendChild(edit);
+    const del = document.createElement('button');
+    del.className='del-x'; del.textContent='✕';
+    del.onclick=()=> scheduleDelete(b.id, b.nombre, ()=>{
+      state.cumpleanos = state.cumpleanos.filter(x=>x.id!==b.id);
+      saveState();
+    });
+    card.appendChild(del);
+    list.appendChild(card);
+  });
+}
+
+/* ================= RENDER: PAGOS ================= */
+function renderPagos(){
+  const holder = document.getElementById('pagos-list');
+  holder.innerHTML='';
+  const today = new Date();
+  const sorted = [...state.pagos].sort((a,b)=> pagoInfo(a,today).diffDays - pagoInfo(b,today).diffDays);
+  if(sorted.length===0){
+    holder.innerHTML = '<div class="empty-note">Aún no hay pagos agregados.</div>';
+    return;
+  }
+  sorted.forEach(p=>{
+    if(pendingDeletes[p.id]){ holder.appendChild(pendingDeleteRow(p.id, p.nombre)); return; }
+    const info = pagoInfo(p, today);
+    const card = document.createElement('div');
+    card.className='pago-card';
+    let badgeClass='ok', badgeText=info.diffDays+' días';
+    if(info.paid){ badgeClass='paid'; badgeText='Pagado'; }
+    else if(info.diffDays<=2) { badgeClass='urgent'; badgeText = info.diffDays<0? 'Vencido' : (info.diffDays===0?'Vence hoy':'Vence en '+info.diffDays+' días'); }
+    else if(info.diffDays<=7) { badgeClass='soon'; badgeText='Vence en '+info.diffDays+' días'; }
+
+    card.innerHTML = '<div class="pago-top">'+
+      '<div><div class="pago-name">'+esc(p.nombre)+'</div><div class="pago-day">Día '+p.dia+' de cada mes</div></div>'+
+      '<span class="badge '+badgeClass+'">'+badgeText+'</span>'+
+      '</div>'+
+      '<div class="pago-bottom">'+
+      '<span class="pago-due">Vence: '+info.due.getDate()+' de '+MONTH_NAMES[info.due.getMonth()]+'</span>'+
+      '</div>';
+
+    if(editModePagos){
+      const actions = document.createElement('div');
+      actions.style.display='flex'; actions.style.gap='8px'; actions.style.marginTop='4px';
+
+      const editBtn = document.createElement('button');
+      editBtn.className='link-btn'; editBtn.style.padding='0'; editBtn.textContent='✏️ Editar';
+      editBtn.onclick = ()=> openPagoModal(p);
+      actions.appendChild(editBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className='link-btn'; delBtn.style.padding='0'; delBtn.style.color='var(--brick)'; delBtn.textContent='✕ Eliminar';
+      delBtn.onclick = ()=> scheduleDelete(p.id, p.nombre, ()=>{
+        state.pagos = state.pagos.filter(x=>x.id!==p.id);
+        delete state.pagosStatus[p.id];
+        saveState();
+      });
+      actions.appendChild(delBtn);
+      card.appendChild(actions);
+    }
+
+    const btn = document.createElement('button');
+    btn.className='paid-btn'+(info.paid?' is-paid':'');
+    btn.textContent = info.paid? '✓ Pagado' : 'Marcar pagado';
+    btn.onclick = ()=>{
+      if(!state.pagosStatus[p.id]) state.pagosStatus[p.id]={};
+      state.pagosStatus[p.id][info.key] = !info.paid;
+      saveState(); renderAll();
+    };
+    card.querySelector('.pago-bottom').appendChild(btn);
+    holder.appendChild(card);
+  });
+}
+
+function openPagoModal(existing){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>'+(existing?'Editar pago':'Nuevo pago')+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow"><label>Nombre del pago</label><input id="pf-nombre" placeholder="Ej: Seguro carro" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+      '<div class="frow"><label>Día del mes en que vence</label><input id="pf-dia" type="number" min="1" max="31" value="'+(existing?existing.dia:'')+'"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="pf-save">Guardar pago</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+
+  document.getElementById('pf-save').onclick = ()=>{
+    const nombre = document.getElementById('pf-nombre').value.trim();
+    const dia = parseInt(document.getElementById('pf-dia').value,10);
+    if(!nombre || !dia || dia<1 || dia>31) return;
+    if(existing){
+      existing.nombre = nombre; existing.dia = dia;
+    } else {
+      state.pagos.push({id:uid(), nombre, dia});
+    }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
+/* ================= RENDER: MEDICAMENTOS ================= */
+function buildTodayMedItems(){
+  const out=[];
+  state.medicamentos.forEach(m=>{
+    (m.horarios||[]).forEach(h=>{
+      out.push({medId:m.id, nombre:m.nombre, dosis:m.dosis, hora:h, statusKey:m.id+'|'+h});
+    });
+  });
+  out.sort((a,b)=> a.hora.localeCompare(b.hora));
+  return out;
+}
+
+function renderMedsToday(){
+  const holder = document.getElementById('meds-today-list');
+  holder.innerHTML='';
+  const key = dateKey(new Date());
+  const items = buildTodayMedItems();
+  if(items.length===0){
+    holder.innerHTML='<div class="empty-note">No tienes medicamentos programados.</div>';
+    return;
+  }
+  const statusMap = state.medsStatus[key] || {};
+  items.forEach(it=>{
+    const done = !!statusMap[it.statusKey];
+    const row=document.createElement('div');
+    row.className='item-row'+(done?' done':'');
+    const chk=document.createElement('div');
+    chk.className='chk'+(done?' on':''); chk.textContent=done?'✓':'';
+    chk.onclick=()=>{
+      if(!state.medsStatus[key]) state.medsStatus[key]={};
+      state.medsStatus[key][it.statusKey] = !state.medsStatus[key][it.statusKey];
+      saveState(); renderAll();
+    };
+    row.appendChild(chk);
+    const mid=document.createElement('div'); mid.style.flex='1';
+    mid.innerHTML = '<div class="item-text">'+esc(it.nombre)+(it.dosis?' — '+esc(it.dosis):'')+'</div><div class="item-meta">🕒 '+esc(it.hora)+'</div>';
+    row.appendChild(mid);
+    holder.appendChild(row);
+  });
+}
+
+function renderMedsList(){
+  const holder = document.getElementById('meds-list');
+  holder.innerHTML='';
+  if(state.medicamentos.length===0){
+    holder.innerHTML='<div class="empty-note">Aún no hay medicamentos agregados.</div>';
+    return;
+  }
+  state.medicamentos.forEach(m=>{
+    if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
+    const card=document.createElement('div');
+    card.className='pago-card';
+    card.innerHTML = '<div class="pago-top"><div><div class="pago-name">'+esc(m.nombre)+'</div>'+
+      '<div class="pago-day">'+(m.dosis?esc(m.dosis)+' · ':'')+'Horarios: '+(m.horarios||[]).join(', ')+'</div></div></div>';
+    const actions=document.createElement('div');
+    actions.style.display='flex'; actions.style.gap='8px'; actions.style.marginTop='4px';
+    const editBtn=document.createElement('button');
+    editBtn.className='link-btn'; editBtn.style.padding='0'; editBtn.textContent='✏️ Editar';
+    editBtn.onclick = ()=> openMedModal(m);
+    actions.appendChild(editBtn);
+    const delBtn=document.createElement('button');
+    delBtn.className='link-btn'; delBtn.style.padding='0'; delBtn.style.color='var(--brick)'; delBtn.textContent='✕ Eliminar';
+    delBtn.onclick = ()=> scheduleDelete(m.id, m.nombre, ()=>{
+      state.medicamentos = state.medicamentos.filter(x=>x.id!==m.id);
+      saveState();
+    });
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
+    holder.appendChild(card);
+  });
+}
+
+function openMedModal(existing){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>'+(existing?'Editar medicamento':'Nuevo medicamento')+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
+        '<div style="flex:1;"><label>Nombre</label><input id="mf-nombre" placeholder="Ej: Losartán" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+        '<span id="mf-mic-holder"></span>'+
+      '</div>'+
+      '<div class="frow"><label>Dosis (opcional)</label><input id="mf-dosis" placeholder="Ej: 50mg, 1 tableta" value="'+(existing&&existing.dosis?esc(existing.dosis):'')+'"></div>'+
+      '<div class="frow"><label>Horarios (separados por coma)</label><input id="mf-horarios" placeholder="Ej: 08:00, 14:00, 20:00" value="'+(existing?esc((existing.horarios||[]).join(', ')):'')+'"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="mf-save">Guardar medicamento</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('mf-mic-holder').appendChild(makeMicButton(document.getElementById('mf-nombre')));
+  document.getElementById('mf-save').onclick = ()=>{
+    const nombre = document.getElementById('mf-nombre').value.trim();
+    const dosis = document.getElementById('mf-dosis').value.trim();
+    const horarios = document.getElementById('mf-horarios').value.split(',').map(s=>s.trim()).filter(Boolean);
+    if(!nombre || horarios.length===0) return;
+    if(existing){
+      existing.nombre=nombre; existing.dosis=dosis; existing.horarios=horarios;
+    } else {
+      state.medicamentos.push({id:uid(), nombre, dosis, horarios});
+    }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
+/* ================= RENDER: MERCADO ================= */
+// Carrito: los productos de la lista predeterminada marcados con enCarrito=true.
+// Tocar un producto en el carrito lo tacha (comprado), sin sacarlo del carrito.
+function renderMercadoCart(){
+  const holder = document.getElementById('cart-list');
+  holder.innerHTML='';
+  const enCarrito = state.mercadoDefault.filter(m=>m.enCarrito);
+  if(enCarrito.length===0){
+    holder.innerHTML='<div class="empty-note">Tu carrito está vacío</div>';
+    return;
+  }
+  enCarrito.forEach(m=>{
+    if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
+    const row=document.createElement('div');
+    row.className='mkt-row'+(m.comprado?' done':'');
+    row.style.cursor='pointer';
+    const chk=document.createElement('div');
+    chk.className='chk'+(m.comprado?' on':'');
+    chk.textContent=m.comprado?'✓':'';
+    row.appendChild(chk);
+    const txt=document.createElement('div');
+    txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
+    row.appendChild(txt);
+    row.onclick=()=>{ m.comprado=!m.comprado; saveState(); renderAll(); };
+    holder.appendChild(row);
+  });
+}
+
+// Lista predeterminada: productos fijos que se pueden sumar/restar; chulear uno lo manda al carrito de arriba.
+function renderMercadoDefault(){
+  const holder = document.getElementById('default-list');
+  holder.innerHTML='';
+  if(state.mercadoDefault.length===0){
+    holder.innerHTML='<div class="empty-note">Aún no hay productos en la lista predeterminada.</div>';
+    return;
+  }
+  state.mercadoDefault.forEach(m=>{
+    if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
+    const row=document.createElement('div');
+    row.className='mkt-row';
+    const chk=document.createElement('div');
+    chk.className='chk'+(m.enCarrito?' on':'');
+    chk.textContent=m.enCarrito?'✓':'';
+    chk.onclick=()=>{
+      m.enCarrito=!m.enCarrito;
+      if(!m.enCarrito){ m.comprado=false; } // al sacarlo del carrito se olvida si estaba tachado
+      else { showToast('Agregado', 'ok'); }
+      saveState(); renderAll();
+    };
+    row.appendChild(chk);
+    const txt=document.createElement('div');
+    txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
+    row.appendChild(txt);
+    if(editModeMercado){
+      const del=document.createElement('button');
+      del.className='del-x'; del.textContent='✕';
+      del.onclick=()=> scheduleDelete(m.id, m.nombre, ()=>{
+        state.mercadoDefault=state.mercadoDefault.filter(x=>x.id!==m.id);
+        saveState();
+      });
+      row.appendChild(del);
+    }
+    holder.appendChild(row);
+  });
+}
+
+/* ================= MASTER RENDER ================= */
+function renderAll(){
+  renderGreeting();
+  renderAlerts();
+  renderHomeThisWeek();
+  renderHomeNextWeek();
+  renderWeek();
+  renderBdayList();
+  renderPagos();
+  renderMercadoCart();
+  renderMercadoDefault();
+  renderMedsToday();
+  renderMedsList();
+  renderSignosList();
+  prepSignosForm();
+}
+
+/* ================= RENDER: SIGNOS VITALES ================= */
+function prepSignosForm(){
+  const f=document.getElementById('sv-fecha'), h=document.getElementById('sv-hora');
+  if(f && !f.value) f.value = dateKey(new Date());
+  if(h && !h.value){ const d=new Date(); h.value = pad(d.getHours())+':'+pad(d.getMinutes()); }
+}
+
+/* ================= MÉTRICAS PERSONALIZADAS (ej: TSH, colesterol) ================= */
+function renderSvOtrosFields(){
+  const holder = document.getElementById('sv-otros-fields');
+  if(!holder) return;
+  holder.innerHTML = state.signosMetricas.map(m=>
+    '<div class="frow"><label>'+esc(m.nombre)+(m.unidad?' ('+esc(m.unidad)+')':'')+'</label><input id="sv-otro-'+m.id+'" type="number" step="any"></div>'
+  ).join('');
+}
+function renderMetricasChips(){
+  const holder = document.getElementById('sv-metricas-chips');
+  if(!holder) return;
+  if(state.signosMetricas.length===0){ holder.innerHTML=''; return; }
+  holder.innerHTML = state.signosMetricas.map(m=>
+    '<span class="metrica-chip">'+esc(m.nombre)+' <button data-mid="'+m.id+'">✕</button></span>'
+  ).join('');
+  holder.querySelectorAll('button[data-mid]').forEach(btn=>{
+    btn.onclick = ()=>{
+      state.signosMetricas = state.signosMetricas.filter(x=>x.id!==btn.dataset.mid);
+      saveState(); renderSvOtrosFields(); renderMetricasChips();
+    };
+  });
+}
+function openMetricaModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>Nueva métrica</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow"><label>Nombre</label><input id="mt-nombre" placeholder="Ej: TSH"></div>'+
+      '<div class="frow"><label>Unidad (opcional)</label><input id="mt-unidad" placeholder="Ej: mUI/L"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="mt-save">Guardar métrica</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('mt-save').onclick = ()=>{
+    const nombre = document.getElementById('mt-nombre').value.trim();
+    const unidad = document.getElementById('mt-unidad').value.trim();
+    if(!nombre) return;
+    state.signosMetricas.push({id:uid(), nombre, unidad});
+    saveState(); root.innerHTML='';
+    renderSvOtrosFields(); renderMetricasChips();
+  };
+}
+
+/* ================= TENDENCIAS (gráficas) ================= */
+function buildSerie(getter){
+  const rows = state.signosVitales
+    .map(r=>({r, v: parseFloat(getter(r))}))
+    .filter(x=> !isNaN(x.v))
+    .sort((a,b)=> (a.r.fecha+a.r.hora).localeCompare(b.r.fecha+b.r.hora));
+  return {
+    labels: rows.map(x=>{ const d=new Date(x.r.fecha+'T00:00:00'); return d.getDate()+'/'+(d.getMonth()+1); }),
+    values: rows.map(x=> x.v)
+  };
+}
+function openTrendsModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+
+  const charts = [
+    {id:'chart-pa', title:'Presión arterial'},
+    {id:'chart-fc', title:'Frecuencia cardíaca'},
+    {id:'chart-gli', title:'Glicemia'},
+    {id:'chart-peso', title:'Peso'}
+  ];
+  state.signosMetricas.forEach(m=> charts.push({id:'chart-m-'+m.id, title:m.nombre+(m.unidad?' ('+m.unidad+')':''), metricaId:m.id}));
+
+  let html = '<h3>📈 Tendencias</h3>';
+  charts.forEach(c=>{
+    html += '<div style="margin-bottom:24px;">'+
+      '<div style="font-weight:800;font-size:14px;margin-bottom:6px;">'+esc(c.title)+'</div>'+
+      '<canvas id="'+c.id+'" height="140"></canvas>'+
+      '<div class="empty-note" id="'+c.id+'-empty" style="display:none;">Aún no hay registros suficientes para esta gráfica.</div>'+
+    '</div>';
+  });
+  html += '<button class="close-btn" id="trends-close">Cerrar</button>';
+  modal.innerHTML = html;
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('trends-close').onclick = ()=>{ root.innerHTML=''; };
+
+  function draw(id, labels, datasets){
+    const canvas = document.getElementById(id);
+    if(!labels.length){ canvas.style.display='none'; document.getElementById(id+'-empty').style.display='block'; return; }
+    new Chart(canvas.getContext('2d'), {
+      type:'line',
+      data:{ labels, datasets },
+      options:{ responsive:true, plugins:{legend:{display: datasets.length>1}}, scales:{y:{beginAtZero:false}} }
+    });
+  }
+
+  const sis = buildSerie(r=>r.sistolica), dia = buildSerie(r=>r.diastolica);
+  draw('chart-pa', sis.labels.length>=dia.labels.length?sis.labels:dia.labels, [
+    {label:'Sistólica', data:sis.values, borderColor:'#BD5B45', tension:0.3},
+    {label:'Diastólica', data:dia.values, borderColor:'#6E97A0', tension:0.3}
+  ].filter(d=>d.data.length));
+
+  const fc = buildSerie(r=>r.fc);
+  draw('chart-fc', fc.labels, [{label:'FC', data:fc.values, borderColor:'#6E8B5A', tension:0.3}]);
+
+  const gli = buildSerie(r=>r.glicemia);
+  draw('chart-gli', gli.labels, [{label:'Glicemia', data:gli.values, borderColor:'#D99A2B', tension:0.3}]);
+
+  const peso = buildSerie(r=>r.peso);
+  draw('chart-peso', peso.labels, [{label:'Peso', data:peso.values, borderColor:'#9B7EBD', tension:0.3}]);
+
+  state.signosMetricas.forEach(m=>{
+    const serie = buildSerie(r=> (r.otros && r.otros[m.id]) || '');
+    draw('chart-m-'+m.id, serie.labels, [{label:m.nombre, data:serie.values, borderColor:'#5B9BD5', tension:0.3}]);
+  });
+}
+
+/* ================= EVALUACIÓN DE SIGNOS VITALES ================= */
+// Rangos de referencia generales (adulto), no un diagnóstico — siempre se sugiere consultar al médico.
+function evaluarSignos(r){
+  const avisos = [];
+  const sis = parseFloat(r.sistolica), dia = parseFloat(r.diastolica);
+  if(!isNaN(sis) && !isNaN(dia)){
+    if(sis>=180 || dia>=120) avisos.push({urgente:true, corto:'⚠️ Presión muy alta', texto:'Presión muy alta ('+sis+'/'+dia+'). Es recomendable buscar atención médica pronto.'});
+    else if(sis>=140 || dia>=90) avisos.push({urgente:false, corto:'⚠️ Presión alta', texto:'Presión por encima del rango típico ('+sis+'/'+dia+').'});
+    else if(sis<90 || dia<60) avisos.push({urgente:false, corto:'⚠️ Presión baja', texto:'Presión por debajo del rango típico ('+sis+'/'+dia+').'});
+  }
+  const gli = parseFloat(r.glicemia);
+  if(!isNaN(gli)){
+    if(gli<70) avisos.push({urgente:true, corto:'⚠️ Glicemia baja', texto:'Glicemia baja ('+gli+' mg/dL). Si hay síntomas, comer algo con azúcar y volver a medir.'});
+    else if(gli>=250) avisos.push({urgente:true, corto:'⚠️ Glicemia muy alta', texto:'Glicemia muy alta ('+gli+' mg/dL). Es recomendable buscar atención médica pronto.'});
+    else if(gli>=126) avisos.push({urgente:false, corto:'⚠️ Glicemia elevada', texto:'Glicemia por encima del rango típico en ayunas ('+gli+' mg/dL).'});
+  }
+  return avisos;
+}
+
+function showSignosWarningModal(avisos){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const items = avisos.map(a=> '<div class="alert '+(a.urgente?'payment':'med')+'" style="margin-bottom:8px;"><span class="ic">⚠️</span><span>'+esc(a.texto)+'</span></div>').join('');
+  modal.innerHTML = '<h3>Registro guardado</h3>'+items+
+    '<p style="font-size:12.5px;color:var(--ink-soft);">Estos son rangos de referencia generales, no un diagnóstico. Ante cualquier duda o si persiste, consulta a un médico.</p>'+
+    '<button class="close-btn" id="sv-warning-close">Entendido</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('sv-warning-close').onclick = ()=>{ root.innerHTML=''; };
+}
+
+function renderSignosList(){
+  const holder = document.getElementById('signos-list');
+  holder.innerHTML='';
+  if(state.signosVitales.length===0){
+    holder.innerHTML='<div class="empty-note">Aún no hay registros.</div>';
+    return;
+  }
+  const sorted = [...state.signosVitales].sort((a,b)=> (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+  sorted.forEach(r=>{
+    if(pendingDeletes[r.id]){ holder.appendChild(pendingDeleteRow(r.id, 'registro')); return; }
+    const parts=[];
+    if(r.sistolica || r.diastolica) parts.push('PA: '+(r.sistolica||'--')+'/'+(r.diastolica||'--'));
+    if(r.fc) parts.push('FC: '+r.fc+' lpm');
+    if(r.glicemia) parts.push('Glicemia: '+r.glicemia+' mg/dL');
+    if(r.peso) parts.push('Peso: '+r.peso+' kg');
+    Object.keys(r.otros||{}).forEach(mid=>{
+      const def = state.signosMetricas.find(m=>m.id===mid);
+      if(def) parts.push(def.nombre+': '+r.otros[mid]+(def.unidad?' '+def.unidad:''));
+    });
+    const avisos = evaluarSignos(r);
+    const d = new Date(r.fecha+'T00:00:00');
+    const card=document.createElement('div');
+    card.className='pago-card';
+    card.innerHTML = '<div class="pago-top"><div><div class="pago-name">'+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+(r.hora?' · '+esc(r.hora):'')+'</div>'+
+      '<div class="pago-day">'+esc(parts.join(' · '))+'</div>'+
+      (avisos.length? '<div class="pago-day" style="color:var(--brick);font-weight:800;margin-top:2px;">'+avisos.map(a=>esc(a.corto)).join(' · ')+'</div>':'')+
+      '</div></div>';
+    const del=document.createElement('button');
+    del.className='link-btn'; del.style.padding='0'; del.style.color='var(--brick)'; del.textContent='✕ Eliminar';
+    del.onclick=()=> scheduleDelete(r.id, 'registro', ()=>{
+      state.signosVitales = state.signosVitales.filter(x=>x.id!==r.id);
+      saveState();
+    });
+    card.appendChild(del);
+    holder.appendChild(card);
+  });
+}
+
+/* ================= EXPORTAR SIGNOS VITALES A PDF ================= */
+async function exportSignosPDF(){
+  if(state.signosVitales.length===0){
+    showToast('No hay registros para exportar.', 'error');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(16);
+  doc.text((state.settings.appName||'AIenda')+' — Historial de signos vitales', 14, 18);
+  doc.setFontSize(10);
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-CO'), 14, 25);
+
+  const sorted = [...state.signosVitales].sort((a,b)=> (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+  let y = 36;
+  doc.setFontSize(11);
+  doc.text('Fecha', 14, y);
+  doc.text('Hora', 44, y);
+  doc.text('PA', 64, y);
+  doc.text('FC', 88, y);
+  doc.text('Glicemia', 108, y);
+  doc.text('Peso', 140, y);
+  y += 3;
+  doc.line(14, y, 196, y);
+  y += 7;
+
+  doc.setFontSize(10);
+  sorted.forEach(r=>{
+    if(y > 280){ doc.addPage(); y = 20; }
+    const d = new Date(r.fecha+'T00:00:00');
+    const fechaTxt = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+    doc.text(fechaTxt, 14, y);
+    doc.text(r.hora||'--', 44, y);
+    doc.text((r.sistolica||r.diastolica) ? (r.sistolica||'--')+'/'+(r.diastolica||'--') : '--', 64, y);
+    doc.text(r.fc ? r.fc+' lpm' : '--', 88, y);
+    doc.text(r.glicemia ? r.glicemia+' mg/dL' : '--', 108, y);
+    doc.text(r.peso ? r.peso+' kg' : '--', 140, y);
+    y += 7;
+  });
+
+  const blob = doc.output('blob');
+  const file = new File([blob], 'signos-vitales-aienda.pdf', {type:'application/pdf'});
+
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({ files:[file], title:'Signos vitales — AIenda' });
+      return;
+    }catch(e){ /* si cancela el compartir, no pasa nada */ return; }
+  }
+  doc.save('signos-vitales-aienda.pdf'); // navegadores sin "compartir": lo descarga directo
+}
+
+/* ================= HOME: esta semana / próxima semana (carrusel horizontal) ================= */
+function buildSimpleDayCard(d){
+  const dname = DAY_NAMES[(d.getDay()+6)%7];
+  const key = dateKey(d);
+  const isToday = sameDate(d, new Date());
+  const card = document.createElement('div');
+  card.className='day-card hscroll-card'+(isToday?' is-today':'');
+  card.innerHTML = '<div class="day-head"><span class="dname">'+dname+'</span><span class="ddate">'+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</span></div>';
+
+  const bdays = bdaysOn(d);
+  bdays.forEach(b=>{
+    const tag=document.createElement('div');
+    tag.className='tag-cumple';
+    tag.textContent='🎂 Cumpleaños de '+b.nombre;
+    card.appendChild(tag);
+  });
+
+  const items = buildDayItems(d);
+  if(items.length===0 && bdays.length===0){
+    const p=document.createElement('div'); p.className='empty-note'; p.textContent='Sin actividades.';
+    card.appendChild(p);
+  } else {
+    items.forEach(it=> card.appendChild(renderItemRow(it,key)));
+  }
+  return card;
+}
+
+function renderHomeWeekSection(offset, holderId, emptyText){
+  const holder = document.getElementById(holderId);
+  const dates = getWeekDates(offset);
+  const hasContent = dates.some(d => buildDayItems(d).length>0 || bdaysOn(d).length>0);
+  if(!hasContent){
+    holder.className = '';
+    holder.innerHTML = '<div class="empty-note">'+emptyText+'</div>';
+    return;
+  }
+  holder.className = 'hscroll';
+  holder.innerHTML = '';
+  dates.forEach(d=> holder.appendChild(buildSimpleDayCard(d)));
+}
+
+function renderHomeThisWeek(){
+  renderHomeWeekSection(0, 'home-thisweek', 'Sin actividades para esta semana');
+}
+function renderHomeNextWeek(){
+  renderHomeWeekSection(1, 'home-nextweek', 'Sin actividades para la próxima semana');
+}
+
+/* ================= CLIMA (Open-Meteo, gratis, sin API key) ================= */
+function weatherCodeInfo(code){
+  const map = {
+    0:{icon:'☀️',desc:'Despejado'}, 1:{icon:'🌤️',desc:'Mayormente despejado'}, 2:{icon:'⛅',desc:'Parcialmente nublado'}, 3:{icon:'☁️',desc:'Nublado'},
+    45:{icon:'🌫️',desc:'Neblina'}, 48:{icon:'🌫️',desc:'Neblina'},
+    51:{icon:'🌦️',desc:'Llovizna'}, 53:{icon:'🌦️',desc:'Llovizna'}, 55:{icon:'🌦️',desc:'Llovizna'},
+    61:{icon:'🌧️',desc:'Lluvia ligera'}, 63:{icon:'🌧️',desc:'Lluvia'}, 65:{icon:'🌧️',desc:'Lluvia fuerte'},
+    80:{icon:'🌧️',desc:'Aguaceros'}, 81:{icon:'🌧️',desc:'Aguaceros'}, 82:{icon:'🌧️',desc:'Aguaceros fuertes'},
+    95:{icon:'⛈️',desc:'Tormenta'}, 96:{icon:'⛈️',desc:'Tormenta con granizo'}, 99:{icon:'⛈️',desc:'Tormenta con granizo'}
+  };
+  return map[code] || {icon:'🌡️',desc:'Clima'};
+}
+async function loadWeather(){
+  const holder = document.getElementById('weather-widget');
+  try{
+    // Coordenadas de Niza (Suba, Bogotá) — ajustar por usuario en una futura versión
+    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=4.7071&longitude=-74.0763&current=temperature_2m,weather_code&hourly=precipitation_probability&forecast_days=1&timezone=America%2FBogota');
+    const data = await res.json();
+    const temp = Math.round(data.current.temperature_2m);
+    const info = weatherCodeInfo(data.current.weather_code);
+
+    // próximas horas desde ahora
+    const times = data.hourly.time;
+    const probs = data.hourly.precipitation_probability;
+    let startIdx = times.findIndex(t => t >= data.current.time);
+    if(startIdx === -1) startIdx = 0;
+    const nextHours = [];
+    for(let i=startIdx; i<Math.min(startIdx+5, times.length); i++){
+      const hour = new Date(times[i]).getHours();
+      const label = (hour%12===0?12:hour%12)+(hour<12?'am':'pm');
+      nextHours.push({label, prob:probs[i]});
+    }
+    const maxProb = nextHours.length? Math.max(...nextHours.map(h=>h.prob)) : 0;
+
+    const chipsHTML = nextHours.map(h=>
+      '<div class="rain-chip"><div class="rc-hour">'+h.label+'</div><div class="rc-prob">'+h.prob+'%</div></div>'
+    ).join('');
+
+    holder.innerHTML =
+      '<div class="weather-card"><span class="w-icon">'+info.icon+'</span><div><div class="w-temp">'+temp+'°C</div><div class="w-desc">'+info.desc+'</div></div></div>'+
+      (nextHours.length ? '<div class="rain-row">'+
+        '<div class="rain-label">🌧️ Lluvia próximas horas'+(maxProb>=50?' — lleva paraguas':'')+'</div>'+
+        '<div class="rain-chips">'+chipsHTML+'</div>'+
+      '</div>' : '');
+  }catch(e){ holder.innerHTML=''; }
+}
+
+/* ================= TABS ================= */
+function switchTab(key){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===key));
+  document.querySelectorAll('.tabpanel').forEach(p=>p.classList.add('hidden'));
+  document.getElementById('tab-'+key).classList.remove('hidden');
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
+});
+
+/* ================= CONFIGURACIÓN: mostrar/ocultar pestañas y clima ================= */
+function applyTabVisibility(){
+  TAB_DEFS.forEach(t=>{
+    const enabled = state.settings.tabs[t.key];
+    const btn = document.querySelector('.tab-btn[data-tab="'+t.key+'"]');
+    if(btn) btn.classList.toggle('hidden', !enabled);
+  });
+  const activeBtn = document.querySelector('.tab-btn.active');
+  if(activeBtn && activeBtn.dataset.tab!=='home' && activeBtn.classList.contains('hidden')){
+    switchTab('home');
+  }
+}
+function applyWeatherVisibility(){
+  document.getElementById('weather-widget').classList.toggle('hidden', !state.settings.weatherEnabled);
+}
+function applyMicVisibility(){
+  document.querySelectorAll('.mic-btn').forEach(b=> b.classList.toggle('hidden', !state.settings.micEnabled));
+}
+
+/* ================= NOTIFICACIONES PUSH ================= */
+const VAPID_PUBLIC_KEY = 'BEtoNmVmXXPlz0inHauCKQ8adHhWdvfm8S1c7dvj4t0W12NNcSJwMUMqJgiwSezVlVMc4X7iLCSYhhJSZDbDBP4';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData = atob(base64);
+  const arr = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;i++) arr[i]=rawData.charCodeAt(i);
+  return arr;
+}
+
+async function enablePush(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    showToast('Este navegador no soporta notificaciones push.', 'error');
+    return false;
+  }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      showToast('No se concedió el permiso de notificaciones.', 'error');
+      return false;
+    }
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    await fetch('/api/subscribe', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(sub)
+    });
+    return true;
+  }catch(e){
+    console.error('No se pudo activar el push', e);
+    showToast('No se pudo activar las notificaciones.', 'error');
+    return false;
+  }
+}
+
+async function disablePush(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub) await sub.unsubscribe();
+  }catch(e){ /* si falla, no pasa nada grave */ }
+}
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+function refreshAccountInfo(){
+  const el = document.getElementById('settings-account-email');
+  if(el && currentUser) el.textContent = currentUser.email;
+}
+
+function openSettingsModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const rows = TAB_DEFS.map(t=>
+    '<label class="settings-row"><span>'+t.icon+' '+t.label+'</span><input type="checkbox" data-tabkey="'+t.key+'" '+(state.settings.tabs[t.key]?'checked':'')+'></label>'
+  ).join('');
+  const swatches = THEMES.map(t=>
+    '<div class="swatch'+(state.settings.theme===t.key?' selected':'')+'" data-theme="'+t.key+'" style="background:'+t.color+';" title="'+t.label+'"></div>'
+  ).join('');
+  const avatars = AVATAR_OPTIONS.map(a=>
+    '<div class="avatar-opt'+(state.settings.avatar===a?' selected':'')+'" data-avatar="'+a+'">'+a+'</div>'
+  ).join('');
+  const TEXT_SIZES = [{v:1,l:'Normal',fs:'14px'},{v:1.15,l:'Grande',fs:'18px'},{v:1.3,l:'Muy grande',fs:'22px'}];
+  const textSizeBtns = TEXT_SIZES.map(t=>
+    '<button class="textsize-opt'+((state.settings.textScale||1)===t.v?' selected':'')+'" data-scale="'+t.v+'" style="font-size:'+t.fs+';">A<div style="font-size:10px;font-weight:700;margin-top:2px;">'+t.l+'</div></button>'
+  ).join('');
+  modal.innerHTML = '<h3>⚙️ Configuración</h3>'+
+    '<div class="settings-subtitle">Cuenta</div>'+
+    '<div class="settings-row" style="cursor:default;"><span>✉️ <span id="settings-account-email">'+(currentUser?esc(currentUser.email):'')+'</span></span></div>'+
+    '<button class="link-btn" id="btn-import-legacy" style="padding:0 2px;margin-bottom:6px;">↥ Importar datos de Pollito (una sola vez)</button><br>'+
+    '<button class="link-btn" id="btn-logout" style="padding:0 2px;color:var(--brick);margin-bottom:10px;">Cerrar sesión</button>'+
+    '<div class="settings-subtitle">Nombre</div>'+
+    '<div class="frow"><input id="settings-name" value="'+esc(state.settings.appName||'AIenda')+'" placeholder="Ej: María"></div>'+
+    '<div class="settings-subtitle">Avatar</div>'+
+    '<div class="avatar-row">'+avatars+'</div>'+
+    '<div class="settings-subtitle">Paleta de colores</div>'+
+    '<div class="swatch-row">'+swatches+'</div>'+
+    '<div class="settings-subtitle">Tamaño de letra</div>'+
+    '<div class="textsize-row">'+textSizeBtns+'</div>'+
+    '<div class="settings-subtitle">Pestañas</div>'+
+    '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas una, su información se guarda igual, solo deja de verse.</p>'+
+    '<div class="settings-group">'+rows+'</div>'+
+    '<label class="settings-row"><span>🌤️ Barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
+    '<label class="settings-row"><span>🎤 Dictado por voz</span><input type="checkbox" id="settings-mic" '+(state.settings.micEnabled?'checked':'')+'></label>'+
+    '<label class="settings-row"><span>🔔 Notificaciones push</span><input type="checkbox" id="settings-push" '+(state.settings.pushEnabled?'checked':'')+'></label>'+
+    '<button class="close-btn" id="settings-close">Cerrar</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+
+  document.getElementById('btn-import-legacy').onclick = importLegacyPollito;
+  document.getElementById('btn-logout').onclick = signOut;
+
+  document.getElementById('settings-name').onchange = (e)=>{
+    const val = e.target.value.trim();
+    state.settings.appName = val || 'AIenda';
+    saveState(); applyPersonalization(); renderAll();
+    showToast('Nombre actualizado', 'ok');
+  };
+  modal.querySelectorAll('.avatar-opt').forEach(el=>{
+    el.onclick = ()=>{
+      state.settings.avatar = el.dataset.avatar;
+      saveState(); applyPersonalization();
+      modal.querySelectorAll('.avatar-opt').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+  });
+  modal.querySelectorAll('.swatch').forEach(el=>{
+    el.onclick = ()=>{
+      state.settings.theme = el.dataset.theme;
+      saveState(); applyPersonalization();
+      modal.querySelectorAll('.swatch').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+  });
+  modal.querySelectorAll('.textsize-opt').forEach(el=>{
+    el.onclick = ()=>{
+      state.settings.textScale = parseFloat(el.dataset.scale);
+      saveState(); applyTextScale();
+      modal.querySelectorAll('.textsize-opt').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+  });
+
+  modal.querySelectorAll('input[data-tabkey]').forEach(inp=>{
+    inp.onchange = ()=>{
+      state.settings.tabs[inp.dataset.tabkey] = inp.checked;
+      saveState(); applyTabVisibility();
+    };
+  });
+  document.getElementById('settings-weather').onchange = (e)=>{
+    state.settings.weatherEnabled = e.target.checked;
+    saveState(); applyWeatherVisibility();
+  };
+  document.getElementById('settings-mic').onchange = (e)=>{
+    state.settings.micEnabled = e.target.checked;
+    saveState(); applyMicVisibility();
+  };
+  document.getElementById('settings-push').onchange = async (e)=>{
+    if(e.target.checked){
+      const ok = await enablePush();
+      if(!ok){ e.target.checked = false; return; }
+      state.settings.pushEnabled = true;
+      showToast('Notificaciones activadas', 'ok');
+    } else {
+      await disablePush();
+      state.settings.pushEnabled = false;
+    }
+    saveState();
+  };
+  document.getElementById('settings-close').onclick = ()=>{ root.innerHTML=''; };
+}
+document.getElementById('btn-settings').onclick = openSettingsModal;
+
+document.getElementById('week-prev').onclick = ()=>{ activitiesWeekStart.setDate(activitiesWeekStart.getDate()-7); renderWeek(); };
+document.getElementById('week-next').onclick = ()=>{ activitiesWeekStart.setDate(activitiesWeekStart.getDate()+7); renderWeek(); };
+document.getElementById('btn-jump-date').onclick = ()=> openJumpDateModal();
+
+function openJumpDateModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const curYear = activitiesWeekStart.getFullYear();
+  const curMonth = activitiesWeekStart.getMonth();
+  const yearsOptions = [];
+  for(let y=curYear-3; y<=curYear+3; y++) yearsOptions.push(y);
+  modal.innerHTML = '<h3>📅 Ir a un mes</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="form-two">'+
+        '<div class="frow"><label>Mes</label><select id="jd-mes">'+MONTH_NAMES.map((m,i)=>'<option value="'+i+'"'+(i===curMonth?' selected':'')+'>'+m+'</option>').join('')+'</select></div>'+
+        '<div class="frow"><label>Año</label><select id="jd-anio">'+yearsOptions.map(y=>'<option value="'+y+'"'+(y===curYear?' selected':'')+'>'+y+'</option>').join('')+'</select></div>'+
+      '</div>'+
+      '<button class="pill-btn yolk" id="jd-hoy" style="width:100%;margin-top:4px;">Ir a hoy</button>'+
+    '</div>'+
+    '<button class="close-btn" id="jd-ir">Ir a ese mes</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+
+  document.getElementById('jd-ir').onclick = ()=>{
+    const mes = parseInt(document.getElementById('jd-mes').value,10);
+    const anio = parseInt(document.getElementById('jd-anio').value,10);
+    activitiesWeekStart = getMonday(new Date(anio, mes, 1));
+    root.innerHTML=''; renderWeek();
+  };
+  document.getElementById('jd-hoy').onclick = ()=>{
+    activitiesWeekStart = getMonday(new Date());
+    root.innerHTML=''; renderWeek();
+  };
+}
+
+document.getElementById('btn-add-bday').onclick = ()=> openBdayModal(null);
+document.getElementById('btn-add-pago').onclick = ()=> openPagoModal(null);
+document.getElementById('btn-toggle-edit-pagos').onclick = ()=>{
+  editModePagos = !editModePagos;
+  document.getElementById('btn-toggle-edit-pagos').textContent = editModePagos ? '✓ Listo' : '✏️ Editar';
+  document.getElementById('btn-add-pago').classList.toggle('hidden', !editModePagos);
+  renderPagos();
+};
+document.getElementById('btn-toggle-edit-mercado').onclick = ()=>{
+  editModeMercado = !editModeMercado;
+  document.getElementById('btn-toggle-edit-mercado').textContent = editModeMercado ? '✓ Listo' : '✏️ Editar';
+  document.getElementById('mkt-add-row').classList.toggle('hidden', !editModeMercado);
+  renderMercadoDefault();
+};
+
+document.getElementById('mkt-add-btn').onclick = ()=>{
+  const inp = document.getElementById('mkt-input');
+  const val = inp.value.trim();
+  if(!val) return;
+  state.mercadoDefault.push({id:uid(), nombre:val, enCarrito:false, comprado:false});
+  inp.value='';
+  saveState(); renderAll();
+};
+document.getElementById('mkt-input').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('mkt-add-btn').click(); });
+document.getElementById('mkt-mic-holder').appendChild(makeMicButton(document.getElementById('mkt-input')));
+document.getElementById('mkt-clear-btn').onclick = ()=>{
+  state.mercadoDefault.forEach(m=>{ m.enCarrito=false; m.comprado=false; });
+  saveState(); renderAll();
+};
+
+/* ================= INIT ================= */
+document.getElementById('btn-dark-toggle').onclick = ()=>{
+  const currentlyDark = document.body.classList.contains('dark-mode');
+  darkOverride = !currentlyDark;
+  applyDarkMode();
+};
+document.getElementById('btn-add-med').onclick = ()=> openMedModal(null);
+document.getElementById('sv-save').onclick = ()=>{
+  const fecha = document.getElementById('sv-fecha').value || dateKey(new Date());
+  const hora = document.getElementById('sv-hora').value;
+  const sistolica = document.getElementById('sv-sistolica').value.trim();
+  const diastolica = document.getElementById('sv-diastolica').value.trim();
+  const fc = document.getElementById('sv-fc').value.trim();
+  const glicemia = document.getElementById('sv-glicemia').value.trim();
+  const peso = document.getElementById('sv-peso').value.trim();
+  const otros = {};
+  state.signosMetricas.forEach(m=>{
+    const el = document.getElementById('sv-otro-'+m.id);
+    if(el && el.value.trim()) otros[m.id] = el.value.trim();
+  });
+  if(!sistolica && !diastolica && !fc && !glicemia && !peso && Object.keys(otros).length===0) return;
+  const nuevoRegistro = {id:uid(), fecha, hora, sistolica, diastolica, fc, glicemia, peso, otros};
+  state.signosVitales.push(nuevoRegistro);
+  ['sv-sistolica','sv-diastolica','sv-fc','sv-glicemia','sv-peso','sv-fecha','sv-hora'].forEach(id=> document.getElementById(id).value='');
+  state.signosMetricas.forEach(m=>{ const el=document.getElementById('sv-otro-'+m.id); if(el) el.value=''; });
+  saveState(); renderAll();
+  const avisos = evaluarSignos(nuevoRegistro);
+  if(avisos.length) showSignosWarningModal(avisos);
+};
+document.getElementById('btn-export-signos').onclick = exportSignosPDF;
+document.getElementById('btn-add-metrica').onclick = openMetricaModal;
+document.getElementById('btn-trends').onclick = openTrendsModal;
+setInterval(applyDarkMode, 5*60*1000); // revisa cada 5 min para la transición automática si deja la app abierta
+
+/* Acceso: botones de la pantalla de login */
+document.getElementById('auth-send-btn').onclick = sendCode;
+document.getElementById('auth-back-btn').onclick = resetAuthForm;
+document.getElementById('auth-email').addEventListener('keydown', e=>{ if(e.key==='Enter') sendCode(); });
+
+(async function init(){
+  applyDarkMode(); // aplica el modo oscuro incluso antes de iniciar sesión
+
+  // Si el correo trae un enlace mágico (en vez de código), Supabase lo detecta solo.
+  sb.auth.onAuthStateChange((event, session)=>{
+    if(event==='SIGNED_IN' && session && session.user && !currentUser){
+      onLoggedIn(session.user);
+    }
+    if(event==='SIGNED_OUT'){
+      currentUser = null;
+      resetAuthForm();
+      showAuthScreen();
+    }
+  });
+
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session && session.user){
+    await onLoggedIn(session.user);
+  } else {
+    showAuthScreen();
+  }
+})();
+</script>
+</body>
+</html>
