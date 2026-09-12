@@ -37,8 +37,9 @@
     --sky-light:#22303580;
     --brick-light:#3A241E;
     --ink:#F2E8D8;
-    --ink-soft:#B7A996;
+    --ink-soft:#C9BBA8;
     --line:#453B31;
+    --sky:#8FC1CC;
   }
   body.dark-mode .greet-card{ box-shadow:0 10px 24px -12px rgba(0,0,0,.6); }
   body.dark-mode .modal-bg{ background:rgba(0,0,0,.65); }
@@ -124,8 +125,8 @@
     background:var(--sky-light);border-radius:20px 20px 0 0;padding:16px 18px;margin-top:14px;
   }
   .weather-card .w-icon{font-size:40px;}
-  .weather-card .w-temp{font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600;color:#2E4C52;}
-  .weather-card .w-desc{font-size:13px;color:#4C6A70;font-weight:700;}
+  .weather-card .w-temp{font-family:'Fredoka',sans-serif;font-size:22px;font-weight:600;color:var(--ink);}
+  .weather-card .w-desc{font-size:13px;color:var(--ink-soft);font-weight:700;}
   .rain-row{
     background:var(--shell);border:1px solid var(--sky-light);border-top:none;
     border-radius:0 0 20px 20px;padding:12px 18px 14px;
@@ -136,8 +137,8 @@
     flex:1;min-width:48px;text-align:center;background:var(--sky-light);
     border-radius:12px;padding:7px 4px;
   }
-  .rain-chip .rc-hour{font-size:11px;font-weight:800;color:#4C6A70;}
-  .rain-chip .rc-prob{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;color:#2E4C52;margin-top:1px;}
+  .rain-chip .rc-hour{font-size:11px;font-weight:800;color:var(--ink-soft);}
+  .rain-chip .rc-prob{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;color:var(--ink);margin-top:1px;}
 
   .wrap{max-width:520px;margin:0 auto;padding:0 16px;}
 
@@ -275,6 +276,12 @@
     margin-left:6px; background:var(--yolk); color:#4A3410; font-weight:800; font-size:13px;
     border-radius:10px; padding:9px 11px; cursor:pointer;
   }
+  .rep-row{ display:flex; gap:8px; margin-bottom:9px; }
+  .rep-btn{
+    flex:1; background:var(--shell); border:2px solid var(--line); border-radius:14px;
+    padding:9px 6px; cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:600; font-size:13px; color:var(--ink);
+  }
+  .rep-btn.selected{ border-color:var(--yolk-dark); background:var(--moss-light); }
 
   /* ---------- pill buttons ---------- */
   .pill-btn{
@@ -1085,10 +1092,24 @@ function dueDateFor(y, m, dia){
   const clamped = Math.min(dia, lastDayOfMonth(y,m));
   return new Date(y, m, clamped);
 }
+// Para pagos "cada 2 meses": como 12 es divisible entre 2, un pago bimensual siempre cae
+// en todos los meses pares o en todos los impares del año, sin importar el año. Guardamos
+// un mes de referencia (pago.mesInicio) y de ahí sacamos la paridad.
+function avanzarAMesValido(pago, y, m){
+  if(pago.frecuencia!=='bimestral') return {y, m};
+  const paridad = (pago.mesInicio||0) % 2;
+  while(m % 2 !== paridad){ m++; if(m>11){ m=0; y++; } }
+  return {y, m};
+}
 function pagoInfo(pago, today){
-  const y = today.getFullYear(), m = today.getMonth();
+  let y = today.getFullYear(), m = today.getMonth();
+  ({y, m} = avanzarAMesValido(pago, y, m));
   let due = dueDateFor(y, m, pago.dia);
-  if(startOfDay(due) < startOfDay(today)) due = dueDateFor(y, m+1, pago.dia);
+  if(startOfDay(due) < startOfDay(today)){
+    m++; if(m>11){ m=0; y++; }
+    ({y, m} = avanzarAMesValido(pago, y, m));
+    due = dueDateFor(y, m, pago.dia);
+  }
   const key = due.getFullYear()+'-'+pad(due.getMonth()+1);
   const paid = !!(state.pagosStatus[pago.id] && state.pagosStatus[pago.id][key]);
   const diffDays = Math.round((startOfDay(due) - startOfDay(today))/86400000);
@@ -1209,23 +1230,19 @@ function renderItemRow(it, dayKey){
   mid.innerHTML = html;
   row.appendChild(mid);
 
-  if(it.type==='compromiso'){
+  if(it.type==='compromiso' || it.type==='template'){
     const edit = document.createElement('button');
     edit.className='del-x'; edit.textContent='✏️';
     edit.onclick = ()=>{
-      const c = state.compromisos.find(x=>x.id===it.id);
-      openCompromisoModal(dayKey, c);
-    };
-    row.appendChild(edit);
-  }
-  if(it.type==='template'){
-    const edit = document.createElement('button');
-    edit.className='del-x'; edit.textContent='✏️';
-    edit.onclick = ()=>{
-      const dd = new Date(dayKey+'T00:00:00');
-      const dname = DAY_NAMES[(dd.getDay()+6)%7];
-      const t = state.templates[dname].find(x=>x.id===it.id);
-      openTemplateModal(dname, t);
+      let real;
+      if(it.type==='compromiso'){
+        real = state.compromisos.find(x=>x.id===it.id);
+      } else {
+        const dd = new Date(dayKey+'T00:00:00');
+        const dname = DAY_NAMES[(dd.getDay()+6)%7];
+        real = state.templates[dname].find(x=>x.id===it.id);
+      }
+      openActivityModal(dayKey, real, it.type);
     };
     row.appendChild(edit);
   }
@@ -1299,26 +1316,20 @@ function renderWeek(){
       items.forEach(it=> card.appendChild(renderItemRow(it,key)));
     }
 
-    // add activity (template) — abre el mismo formulario completo (nombre, hora, notas)
+    // un solo botón: el formulario que abre deja elegir si se repite cada semana o es solo este día
     const addActBtn = document.createElement('button');
     addActBtn.className='pill-btn yolk';
     addActBtn.style.cssText='width:100%;margin-top:9px;';
     addActBtn.textContent='+ Agregar actividad';
-    addActBtn.onclick = ()=> openTemplateModal(dname);
+    addActBtn.onclick = ()=> openActivityModal(key, null, null);
     card.appendChild(addActBtn);
-
-    // add compromiso link
-    const linkBtn = document.createElement('button');
-    linkBtn.className='link-btn';
-    linkBtn.textContent='📅 Agregar compromiso con hora';
-    linkBtn.onclick = ()=> openCompromisoModal(key);
-    card.appendChild(linkBtn);
 
     holder.appendChild(card);
   });
 }
 
-function openCompromisoModal(dateKeyStr, existing){
+/* ================= NUEVA/EDITAR ACTIVIDAD (elige repetir cada semana o solo ese día) ================= */
+function openActivityModal(dateKeyStr, existing, existingType){
   const d = new Date(dateKeyStr+'T00:00:00');
   const dname = DAY_NAMES[(d.getDay()+6)%7];
   const root = document.getElementById('modal-root');
@@ -1326,73 +1337,63 @@ function openCompromisoModal(dateKeyStr, existing){
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
+  const nombreActual = existing ? (existingType==='template' ? existing.texto : existing.nombre) : '';
   const hasHora = !!(existing && existing.hora);
-  modal.innerHTML = '<h3>'+(existing?'Editar compromiso':'Nuevo compromiso')+' — '+dname+' '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</h3>'+
+  let repite = existing ? (existingType==='template') : true; // nuevo: por defecto se repite cada semana
+  modal.innerHTML = '<h3>'+(existing?'Editar actividad':'Nueva actividad')+' — '+dname+' '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><label>Nombre del compromiso</label><input id="cf-nombre" placeholder="Ej: Cita médica" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
-        '<span id="cf-mic-holder"></span>'+
+        '<div style="flex:1;"><label>Nombre</label><input id="ac-nombre" placeholder="Ej: Ejercicio" value="'+esc(nombreActual)+'"></div>'+
+        '<span id="ac-mic-holder"></span>'+
       '</div>'+
-      '<label class="time-toggle-row"><input type="checkbox" id="cf-hora-toggle" '+(hasHora?'checked':'')+'> Agregar una hora específica</label>'+
-      '<div class="time-picker '+(hasHora?'':'hidden')+'" id="cf-hora-picker"></div>'+
-      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="cf-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
+      '<label style="font-size:12px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:6px;">¿Cuándo?</label>'+
+      '<div class="rep-row">'+
+        '<button type="button" class="rep-btn'+(repite?' selected':'')+'" data-rep="1">Todas las semanas</button>'+
+        '<button type="button" class="rep-btn'+(!repite?' selected':'')+'" data-rep="0">Solo este día</button>'+
+      '</div>'+
+      '<label class="time-toggle-row"><input type="checkbox" id="ac-hora-toggle" '+(hasHora?'checked':'')+'> Agregar una hora específica</label>'+
+      '<div class="time-picker '+(hasHora?'':'hidden')+'" id="ac-hora-picker"></div>'+
+      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="ac-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
     '</div>'+
-    '<button class="close-btn" id="cf-save">Guardar compromiso</button>';
+    '<button class="close-btn" id="ac-save">Guardar</button>';
   bg.appendChild(modal); root.appendChild(bg);
-  document.getElementById('cf-mic-holder').appendChild(makeMicButton(document.getElementById('cf-nombre')));
-  const cfPicker = createTimePicker(document.getElementById('cf-hora-picker'), (existing&&existing.hora)||'09:00');
-  document.getElementById('cf-hora-toggle').onchange = (e)=>{
-    document.getElementById('cf-hora-picker').classList.toggle('hidden', !e.target.checked);
+  document.getElementById('ac-mic-holder').appendChild(makeMicButton(document.getElementById('ac-nombre')));
+  const acPicker = createTimePicker(document.getElementById('ac-hora-picker'), (existing&&existing.hora)||'09:00');
+  document.getElementById('ac-hora-toggle').onchange = (e)=>{
+    document.getElementById('ac-hora-picker').classList.toggle('hidden', !e.target.checked);
   };
+  modal.querySelectorAll('.rep-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      repite = btn.dataset.rep==='1';
+      modal.querySelectorAll('.rep-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+  });
 
-  document.getElementById('cf-save').onclick = ()=>{
-    const nombre = document.getElementById('cf-nombre').value.trim();
+  document.getElementById('ac-save').onclick = ()=>{
+    const nombre = document.getElementById('ac-nombre').value.trim();
     if(!nombre) return;
-    const hora = document.getElementById('cf-hora-toggle').checked ? cfPicker.getValue() : '';
-    const notas = document.getElementById('cf-notas').value.trim();
-    if(existing){
-      existing.nombre=nombre; existing.hora=hora; existing.notas=notas;
-    } else {
-      state.compromisos.push({id:uid(), date:dateKeyStr, nombre, hora, notas});
-    }
-    saveState(); root.innerHTML=''; renderAll();
-  };
-}
+    const hora = document.getElementById('ac-hora-toggle').checked ? acPicker.getValue() : '';
+    const notas = document.getElementById('ac-notas').value.trim();
 
-/* ================= NUEVA/EDITAR ACTIVIDAD (recurrente por día de la semana) ================= */
-function openTemplateModal(dname, existing){
-  const root = document.getElementById('modal-root');
-  root.innerHTML = '';
-  const bg = document.createElement('div'); bg.className='modal-bg';
-  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
-  const modal = document.createElement('div'); modal.className='modal';
-  const hasHora2 = !!(existing && existing.hora);
-  modal.innerHTML = '<h3>'+(existing?'Editar actividad':'Nueva actividad')+' — '+dname+'</h3>'+
-    '<div class="form-card" style="border-style:solid;">'+
-      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><label>Nombre de la actividad</label><input id="tf-nombre" placeholder="Ej: Ejercicio" value="'+(existing?esc(existing.texto):'')+'"></div>'+
-        '<span id="tf-mic-holder"></span>'+
-      '</div>'+
-      '<label class="time-toggle-row"><input type="checkbox" id="tf-hora-toggle" '+(hasHora2?'checked':'')+'> Agregar una hora específica</label>'+
-      '<div class="time-picker '+(hasHora2?'':'hidden')+'" id="tf-hora-picker"></div>'+
-      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="tf-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
-    '</div>'+
-    '<button class="close-btn" id="tf-save">Guardar actividad</button>';
-  bg.appendChild(modal); root.appendChild(bg);
-  document.getElementById('tf-mic-holder').appendChild(makeMicButton(document.getElementById('tf-nombre')));
-  const tfPicker = createTimePicker(document.getElementById('tf-hora-picker'), (existing&&existing.hora)||'09:00');
-  document.getElementById('tf-hora-toggle').onchange = (e)=>{
-    document.getElementById('tf-hora-picker').classList.toggle('hidden', !e.target.checked);
-  };
-  document.getElementById('tf-save').onclick = ()=>{
-    const texto = document.getElementById('tf-nombre').value.trim();
-    if(!texto) return;
-    const hora = document.getElementById('tf-hora-toggle').checked ? tfPicker.getValue() : '';
-    const notas = document.getElementById('tf-notas').value.trim();
-    if(existing){
-      existing.texto=texto; existing.hora=hora; existing.notas=notas;
+    // si cambió de tipo (por ejemplo, era recurrente y ahora es solo un día), lo movemos
+    if(existing && existingType==='template' && !repite){
+      Object.keys(state.templates).forEach(dn=>{
+        state.templates[dn] = state.templates[dn].filter(t=>t.id!==existing.id);
+      });
+      existing = null;
+    }
+    if(existing && existingType==='compromiso' && repite){
+      state.compromisos = state.compromisos.filter(c=>c.id!==existing.id);
+      existing = null;
+    }
+
+    if(repite){
+      if(existing){ existing.texto=nombre; existing.hora=hora; existing.notas=notas; }
+      else { state.templates[dname].push({id:uid(), texto:nombre, hora, notas}); }
     } else {
-      state.templates[dname].push({id:uid(), texto, hora, notas});
+      if(existing){ existing.nombre=nombre; existing.hora=hora; existing.notas=notas; }
+      else { state.compromisos.push({id:uid(), date:dateKeyStr, nombre, hora, notas}); }
     }
     saveState(); root.innerHTML=''; renderAll();
   };
@@ -1493,7 +1494,7 @@ function renderPagos(){
     else if(info.diffDays<=7) { badgeClass='soon'; badgeText='Vence en '+info.diffDays+' días'; }
 
     card.innerHTML = '<div class="pago-top">'+
-      '<div><div class="pago-name">'+esc(p.nombre)+'</div><div class="pago-day">Día '+p.dia+' de cada mes</div></div>'+
+      '<div><div class="pago-name">'+esc(p.nombre)+'</div><div class="pago-day">'+(p.frecuencia==='bimestral'?'Día '+p.dia+', cada 2 meses':'Día '+p.dia+' de cada mes')+'</div></div>'+
       '<span class="badge '+badgeClass+'">'+badgeText+'</span>'+
       '</div>'+
       '<div class="pago-bottom">'+
@@ -1539,22 +1540,44 @@ function openPagoModal(existing){
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
+  const esBimestral = existing && existing.frecuencia==='bimestral';
   modal.innerHTML = '<h3>'+(existing?'Editar pago':'Nuevo pago')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow"><label>Nombre del pago</label><input id="pf-nombre" placeholder="Ej: Seguro carro" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
       '<div class="frow"><label>Día del mes en que vence</label><input id="pf-dia" type="number" min="1" max="31" value="'+(existing?existing.dia:'')+'"></div>'+
+      '<div class="frow"><label>Frecuencia</label>'+
+        '<select id="pf-frecuencia" class="settings-input">'+
+          '<option value="mensual"'+(!esBimestral?' selected':'')+'>Cada mes</option>'+
+          '<option value="bimestral"'+(esBimestral?' selected':'')+'>Cada 2 meses</option>'+
+        '</select>'+
+      '</div>'+
+      '<div class="frow'+(esBimestral?'':' hidden')+'" id="pf-mesinicio-row">'+
+        '<label>Uno de los meses en que cae</label>'+
+        '<select id="pf-mesinicio" class="settings-input">'+
+          MONTH_NAMES.map((mn,i)=>'<option value="'+i+'"'+(existing&&existing.mesInicio===i?' selected':'')+'>'+mn+'</option>').join('')+
+        '</select>'+
+      '</div>'+
     '</div>'+
     '<button class="close-btn" id="pf-save">Guardar pago</button>';
   bg.appendChild(modal); root.appendChild(bg);
 
+  document.getElementById('pf-frecuencia').onchange = (e)=>{
+    document.getElementById('pf-mesinicio-row').classList.toggle('hidden', e.target.value!=='bimestral');
+  };
+
   document.getElementById('pf-save').onclick = ()=>{
     const nombre = document.getElementById('pf-nombre').value.trim();
     const dia = parseInt(document.getElementById('pf-dia').value,10);
+    const frecuencia = document.getElementById('pf-frecuencia').value;
+    const mesInicio = parseInt(document.getElementById('pf-mesinicio').value,10);
     if(!nombre || !dia || dia<1 || dia>31) return;
     if(existing){
-      existing.nombre = nombre; existing.dia = dia;
+      existing.nombre = nombre; existing.dia = dia; existing.frecuencia = frecuencia;
+      if(frecuencia==='bimestral') existing.mesInicio = mesInicio; else delete existing.mesInicio;
     } else {
-      state.pagos.push({id:uid(), nombre, dia});
+      const nuevo = {id:uid(), nombre, dia, frecuencia};
+      if(frecuencia==='bimestral') nuevo.mesInicio = mesInicio;
+      state.pagos.push(nuevo);
     }
     saveState(); root.innerHTML=''; renderAll();
   };
