@@ -2431,7 +2431,7 @@ function openAIModal(){
   modal.innerHTML = '<h3>✨ Dime qué necesitas</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><input id="ai-input" placeholder="Ej: gasté 35 mil en mercado"></div>'+
+        '<div style="flex:1;"><input id="ai-input" placeholder="Ej: gasté 35 mil en mercado, o ¿cuándo es el cumpleaños de Juan?"></div>'+
         '<button type="button" class="mic-btn" id="ai-mic-btn" style="display:flex;">🎤</button>'+
       '</div>'+
     '</div>'+
@@ -2471,7 +2471,7 @@ function openAIModal(){
       const token = session && session.access_token;
       const res = await fetch('/api/ai-assist', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre) })
+        body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre), contexto: construirContextoIA() })
       });
       if(res.status===403){ root.innerHTML=''; showPaywallModal(); return; }
       if(!res.ok){ statusEl.textContent='No se pudo procesar. Intenta de nuevo.'; sendBtn.disabled=false; return; }
@@ -2485,9 +2485,46 @@ function openAIModal(){
   };
 }
 
+function construirContextoIA(){
+  const hoy = new Date();
+  return {
+    cumpleanos: state.cumpleanos.map(c=>({ nombre:c.nombre, dia:c.dia, mes:c.mes })),
+    pagos: state.pagos.map(p=>{
+      const info = pagoInfo(p, hoy);
+      return { nombre:p.nombre, diaDelMes:p.dia, frecuencia:p.frecuencia||'mensual', pagado:info.paid, diasParaVencer:info.diffDays };
+    }),
+    presupuesto: state.presupuesto.categorias.map(c=>({ nombre:c.nombre, presupuestoMensual:c.monto, gastadoEsteMes:totalGastadoCategoria(c.id) })),
+    medicamentos: state.medicamentos.map(m=>({ nombre:m.nombre, dosis:m.dosis, horarios:m.horarios }))
+  };
+}
+
+function hablar(texto){
+  if(!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(texto);
+  utter.lang = 'es-CO';
+  speechSynthesis.speak(utter);
+}
+
+function mostrarRespuestaIA(texto){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg){ speechSynthesis.cancel(); root.innerHTML=''; } };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>✨ Respuesta</h3>'+
+    '<p style="font-size:15px;line-height:1.55;">'+esc(texto)+'</p>'+
+    '<button class="close-btn" id="resp-cerrar">Cerrar</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('resp-cerrar').onclick = ()=>{ speechSynthesis.cancel(); root.innerHTML=''; };
+  hablar(texto);
+}
+
 function abrirFormularioConIA(data){
   const tipo = data.tipo, c = data.campos || {};
-  if(tipo==='gasto'){
+  if(tipo==='consulta'){
+    mostrarRespuestaIA(c.respuesta || 'No encontré esa información.');
+  } else if(tipo==='gasto'){
     const cat = state.presupuesto.categorias.find(x=> x.nombre.toLowerCase()===String(c.categoria||'').toLowerCase());
     openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, fecha:c.fecha });
   } else if(tipo==='actividad'){
