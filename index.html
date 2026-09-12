@@ -2524,6 +2524,18 @@ function abrirFormularioConIA(data){
   const tipo = data.tipo, c = data.campos || {};
   if(tipo==='consulta'){
     mostrarRespuestaIA(c.respuesta || 'No encontré esa información.');
+  } else if(tipo==='signos'){
+    if(!state.settings.tabs.signos){ state.settings.tabs.signos = true; applyTabVisibility(); saveState(); }
+    switchTab('signos');
+    document.getElementById('sv-fecha').value = c.fecha || dateKey(new Date());
+    const ahora = new Date();
+    document.getElementById('sv-hora').value = pad(ahora.getHours())+':'+pad(ahora.getMinutes());
+    if(c.sistolica!=null) document.getElementById('sv-sistolica').value = c.sistolica;
+    if(c.diastolica!=null) document.getElementById('sv-diastolica').value = c.diastolica;
+    if(c.fc!=null) document.getElementById('sv-fc').value = c.fc;
+    if(c.glicemia!=null) document.getElementById('sv-glicemia').value = c.glicemia;
+    if(c.peso!=null) document.getElementById('sv-peso').value = c.peso;
+    showToast('Revisa los valores y toca "Guardar registro"', 'ok');
   } else if(tipo==='gasto'){
     const cat = state.presupuesto.categorias.find(x=> x.nombre.toLowerCase()===String(c.categoria||'').toLowerCase());
     openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, fecha:c.fecha });
@@ -2607,10 +2619,11 @@ async function disablePush(){
   try{
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
+    const endpoint = sub && sub.endpoint;
     if(sub) await sub.unsubscribe();
     const { data:{ session } } = await sb.auth.getSession();
-    if(session){
-      await fetch(SUPABASE_URL_PUSH + '/rest/v1/aienda_push?user_id=eq.' + session.user.id, {
+    if(session && endpoint){
+      await fetch(SUPABASE_URL_PUSH + '/rest/v1/aienda_push?endpoint=eq.' + encodeURIComponent(endpoint), {
         method: 'DELETE',
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + session.access_token }
       });
