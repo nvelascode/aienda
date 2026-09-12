@@ -20,9 +20,14 @@ module.exports = async (req, res) => {
     if (!userRes.ok) { res.status(401).json({ error: 'no_auth' }); return; }
     const user = await userRes.json();
 
+    const endpoint = subscription && subscription.endpoint;
+    if (!endpoint) { res.status(400).json({ error: 'invalid_subscription' }); return; }
+
     // Guardamos con el propio token del usuario: las reglas de seguridad (RLS)
-    // solo le dejan escribir su propia fila, así que esto es seguro.
-    const upsertRes = await fetch(SUPABASE_URL + '/rest/v1/aienda_push', {
+    // solo le dejan escribir sus propias filas, así que esto es seguro.
+    // Se identifica cada fila por "endpoint" (único por dispositivo/navegador),
+    // no por usuario, para que una persona pueda tener celular + computador a la vez.
+    const upsertRes = await fetch(SUPABASE_URL + '/rest/v1/aienda_push?on_conflict=endpoint', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,7 +35,7 @@ module.exports = async (req, res) => {
         Authorization: 'Bearer ' + token,
         Prefer: 'resolution=merge-duplicates'
       },
-      body: JSON.stringify({ user_id: user.id, subscription, updated_at: new Date().toISOString() })
+      body: JSON.stringify({ user_id: user.id, subscription, endpoint, updated_at: new Date().toISOString() })
     });
     if (!upsertRes.ok) { res.status(502).json({ error: 'save_failed' }); return; }
 
