@@ -6,7 +6,7 @@ const SUPABASE_URL = 'https://hymclqcdpplamdinfrhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_-PXExRRGp6CTYxgGd5ftBA_aIHY_04D';
 
 // Debe ser la MISMA lista que en ai-assist.js de este proyecto.
-const ALLOWED_EMAILS = ["silvitapinzon2015@gmail.com","nvelascop@ismm.edu.co"];
+const ALLOWED_EMAILS = ['nvelascop@ismm.edu.co', 'silvitapinzon2015@gmail.com'];
 
 module.exports = async (req, res) => {
   try {
