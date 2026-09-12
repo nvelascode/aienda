@@ -2422,67 +2422,89 @@ function showPaywallModal(){
   document.getElementById('paywall-close').onclick = ()=>{ root.innerHTML=''; };
 }
 
+let iaUsandoVoz = true; // se pone en false si la persona elige "prefiero escribirlo"
+
 function openAIModal(){
+  iaUsandoVoz = true;
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
-  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
-  const modal = document.createElement('div'); modal.className='modal';
-  modal.innerHTML = '<h3>✨ Dime qué necesitas</h3>'+
-    '<div class="form-card" style="border-style:solid;">'+
-      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><input id="ai-input" placeholder="Ej: gasté 35 mil en mercado, o ¿cuándo es el cumpleaños de Juan?"></div>'+
-        '<button type="button" class="mic-btn" id="ai-mic-btn" style="display:flex;">🎤</button>'+
-      '</div>'+
-    '</div>'+
-    '<button class="close-btn" id="ai-send">Enviar</button>'+
-    '<p id="ai-status" style="text-align:center;font-size:13px;color:var(--ink-soft);margin-top:8px;"></p>';
-  bg.appendChild(modal); root.appendChild(bg);
-  document.getElementById('ai-input').focus();
-
-  const micBtn = document.getElementById('ai-mic-btn');
-  if(SpeechRec){
-    micBtn.onclick = ()=>{
-      const rec = new SpeechRec();
-      rec.lang = 'es-CO'; rec.interimResults = false; rec.maxAlternatives = 1;
-      micBtn.classList.add('listening'); micBtn.textContent='●';
-      rec.onresult = (e)=>{
-        const inp = document.getElementById('ai-input');
-        const texto = e.results[0][0].transcript;
-        inp.value = inp.value.trim() ? inp.value.trim()+' '+texto : texto;
-      };
-      rec.onerror = ()=>{};
-      rec.onend = ()=>{ micBtn.classList.remove('listening'); micBtn.textContent='🎤'; };
-      try{ rec.start(); }catch(e){ micBtn.classList.remove('listening'); micBtn.textContent='🎤'; }
-    };
-  } else {
-    micBtn.style.display='none';
-  }
-
-  document.getElementById('ai-send').onclick = async ()=>{
-    const texto = document.getElementById('ai-input').value.trim();
-    if(!texto){ showToast('Escribe o dicta algo primero', 'error'); return; }
-    const statusEl = document.getElementById('ai-status');
-    const sendBtn = document.getElementById('ai-send');
-    sendBtn.disabled = true;
-    statusEl.textContent = 'Pensando...';
-    try{
-      const { data:{ session } } = await sb.auth.getSession();
-      const token = session && session.access_token;
-      const res = await fetch('/api/ai-assist', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre), contexto: construirContextoIA() })
-      });
-      if(res.status===403){ root.innerHTML=''; showPaywallModal(); return; }
-      if(!res.ok){ statusEl.textContent='No se pudo procesar. Intenta de nuevo.'; sendBtn.disabled=false; return; }
-      const data = await res.json();
+  let recActual = null;
+  bg.onclick = (e)=>{
+    if(e.target===bg){
+      if(recActual){ try{ recActual.stop(); }catch(err){} }
+      speechSynthesis.cancel();
       root.innerHTML='';
-      abrirFormularioConIA(data);
-    }catch(e){
-      statusEl.textContent = 'Hubo un error. Intenta de nuevo.';
-      sendBtn.disabled = false;
     }
   };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3 style="text-align:center;">✨</h3>'+
+    '<div id="ai-estado" style="text-align:center;padding:18px 10px 6px;font-size:15px;color:var(--ink-soft);min-height:60px;">Preparando micrófono…</div>'+
+    '<div id="ai-modo-texto" class="hidden">'+
+      '<div class="form-card" style="border-style:solid;">'+
+        '<div class="frow"><input id="ai-input" placeholder="Escribe lo que necesitas"></div>'+
+      '</div>'+
+      '<button class="close-btn" id="ai-send">Enviar</button>'+
+    '</div>'+
+    '<button class="link-btn" id="ai-modo-texto-btn" style="display:block;margin:10px auto 0;">✍️ Prefiero escribirlo</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+
+  const estadoEl = document.getElementById('ai-estado');
+
+  document.getElementById('ai-modo-texto-btn').onclick = ()=>{
+    iaUsandoVoz = false;
+    if(recActual){ try{ recActual.stop(); }catch(e){} }
+    estadoEl.classList.add('hidden');
+    document.getElementById('ai-modo-texto-btn').classList.add('hidden');
+    document.getElementById('ai-modo-texto').classList.remove('hidden');
+    document.getElementById('ai-input').focus();
+  };
+  document.getElementById('ai-send').onclick = ()=>{
+    const texto = document.getElementById('ai-input').value.trim();
+    if(!texto){ showToast('Escribe algo primero', 'error'); return; }
+    procesarTextoIA(texto, root, null);
+  };
+  document.getElementById('ai-input')?.addEventListener?.('keydown', e=>{ if(e.key==='Enter') document.getElementById('ai-send').click(); });
+
+  if(!SpeechRec){
+    document.getElementById('ai-modo-texto-btn').click();
+    return;
+  }
+
+  recActual = new SpeechRec();
+  recActual.lang = 'es-CO';
+  recActual.interimResults = false;
+  recActual.maxAlternatives = 1;
+  estadoEl.innerHTML = '🎙️<br>Escuchando… di lo que necesitas';
+  recActual.onresult = (e)=>{
+    const texto = e.results[0][0].transcript;
+    estadoEl.innerHTML = '"'+esc(texto)+'"<br><span style="font-size:13px;">Pensando…</span>';
+    procesarTextoIA(texto, root, estadoEl);
+  };
+  recActual.onerror = (e)=>{
+    if(e.error==='no-speech'){ estadoEl.textContent = 'No escuché nada. Toca el fondo para cerrar, o escribe.'; }
+    else if(e.error==='not-allowed'){ estadoEl.textContent = 'No tengo permiso para usar el micrófono.'; }
+    else { estadoEl.textContent = 'No pude escuchar bien. Intenta de nuevo o escribe.'; }
+  };
+  try{ recActual.start(); }catch(e){ document.getElementById('ai-modo-texto-btn').click(); }
+}
+
+async function procesarTextoIA(texto, root, estadoEl){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token = session && session.access_token;
+    const res = await fetch('/api/ai-assist', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre), contexto: construirContextoIA() })
+    });
+    if(res.status===403){ root.innerHTML=''; showPaywallModal(); return; }
+    if(!res.ok){ if(estadoEl) estadoEl.textContent='No se pudo procesar. Intenta de nuevo.'; return; }
+    const data = await res.json();
+    root.innerHTML='';
+    abrirFormularioConIA(data);
+  }catch(e){
+    if(estadoEl) estadoEl.textContent = 'Hubo un error. Intenta de nuevo.';
+  }
 }
 
 function construirContextoIA(){
@@ -2498,12 +2520,22 @@ function construirContextoIA(){
   };
 }
 
-function hablar(texto){
-  if(!('speechSynthesis' in window)) return;
+function hablar(texto, onEnd){
+  if(!('speechSynthesis' in window)){ if(onEnd) onEnd(); return; }
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(texto);
-  utter.lang = 'es-CO';
+  const voces = speechSynthesis.getVoices();
+  const vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
+  if(vozEs) utter.voice = vozEs;
+  utter.lang = vozEs ? vozEs.lang : 'es-ES';
+  if(onEnd){ utter.onend = onEnd; utter.onerror = onEnd; }
   speechSynthesis.speak(utter);
+}
+
+function prepararVocesTTS(){
+  if(!('speechSynthesis' in window)) return;
+  speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged = ()=>{ speechSynthesis.getVoices(); };
 }
 
 function mostrarRespuestaIA(texto){
@@ -2512,12 +2544,14 @@ function mostrarRespuestaIA(texto){
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg){ speechSynthesis.cancel(); root.innerHTML=''; } };
   const modal = document.createElement('div'); modal.className='modal';
-  modal.innerHTML = '<h3>✨ Respuesta</h3>'+
-    '<p style="font-size:15px;line-height:1.55;">'+esc(texto)+'</p>'+
+  modal.innerHTML = '<h3>✨</h3>'+
+    '<p style="font-size:16px;line-height:1.55;">'+esc(texto)+'</p>'+
     '<button class="close-btn" id="resp-cerrar">Cerrar</button>';
   bg.appendChild(modal); root.appendChild(bg);
   document.getElementById('resp-cerrar').onclick = ()=>{ speechSynthesis.cancel(); root.innerHTML=''; };
-  hablar(texto);
+  if(iaUsandoVoz){
+    hablar(texto, ()=>{ if(document.getElementById('resp-cerrar')) root.innerHTML=''; });
+  }
 }
 
 function abrirFormularioConIA(data){
@@ -3011,6 +3045,7 @@ document.getElementById('auth-email').addEventListener('keydown', e=>{ if(e.key=
 
 (async function init(){
   applyDarkMode(); // aplica el modo oscuro incluso antes de iniciar sesión
+  prepararVocesTTS();
 
   // Si el correo trae un enlace mágico (en vez de código), Supabase lo detecta solo.
   sb.auth.onAuthStateChange((event, session)=>{
