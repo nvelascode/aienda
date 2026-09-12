@@ -1284,8 +1284,14 @@ function openGastoModal(prefill){
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
   const cats = state.presupuesto.categorias;
-  const catActual = (prefill&&prefill.categoriaId&&cats.find(c=>c.id===prefill.categoriaId)) || null;
-  const catNombreInicial = catActual ? catActual.nombre : ((prefill&&prefill.categoriaNombre) || '');
+  if(cats.length===0){
+    modal.innerHTML = '<h3>Registrar gasto</h3>'+
+      '<p style="font-size:13.5px;color:var(--ink-soft);">Primero crea al menos una categoría en "+ Agregar categoría".</p>'+
+      '<button class="close-btn" id="gasto-cerrar">Cerrar</button>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('gasto-cerrar').onclick = ()=>{ root.innerHTML=''; };
+    return;
+  }
   modal.innerHTML = '<h3>Registrar gasto</h3>'+
     (prefill?'<p style="font-size:12px;color:var(--ink-soft);margin-top:-8px;">✨ Revisa lo que entendí antes de guardar.</p>':'')+
     '<div class="form-card" style="border-style:solid;">'+
@@ -1295,12 +1301,10 @@ function openGastoModal(prefill){
       '</div>'+
       '<div class="form-two">'+
         '<div class="frow"><label>Monto</label><input id="gasto-monto" type="number" min="0" placeholder="Ej: 25000" value="'+(prefill&&prefill.monto?prefill.monto:'')+'"></div>'+
-        '<div class="frow"><label>Categoría</label>'+
-          '<input id="gasto-categoria" class="settings-input" list="gasto-categoria-list" placeholder="Ej: Transporte" value="'+esc(catNombreInicial)+'">'+
-          '<datalist id="gasto-categoria-list">'+cats.map(c=>'<option value="'+esc(c.nombre)+'">').join('')+'</datalist>'+
-        '</div>'+
+        '<div class="frow"><label>Categoría</label><select id="gasto-categoria" class="settings-input">'+
+          cats.map(c=>'<option value="'+c.id+'"'+(prefill&&prefill.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
+        '</select></div>'+
       '</div>'+
-      '<p style="font-size:12px;color:var(--ink-soft);margin-top:-6px;">Si escribes una categoría que no existe, la creamos sola con este gasto.</p>'+
       '<div class="frow"><label>Fecha</label><input id="gasto-fecha" type="date"></div>'+
     '</div>'+
     '<button class="close-btn" id="gasto-save">Guardar gasto</button>';
@@ -1310,17 +1314,9 @@ function openGastoModal(prefill){
   document.getElementById('gasto-save').onclick = ()=>{
     const nombre = document.getElementById('gasto-nombre').value.trim();
     const monto = parseFloat(document.getElementById('gasto-monto').value);
-    const catTexto = document.getElementById('gasto-categoria').value.trim();
+    const categoriaId = document.getElementById('gasto-categoria').value;
     const fecha = document.getElementById('gasto-fecha').value || dateKey(new Date());
     if(!nombre || isNaN(monto) || monto<=0) return;
-    if(!catTexto){ showToast('Escribe una categoría (nueva o existente)', 'error'); return; }
-    let cat = state.presupuesto.categorias.find(c=> c.nombre.toLowerCase()===catTexto.toLowerCase());
-    if(!cat){
-      cat = { id:uid(), nombre:catTexto, monto:0 };
-      state.presupuesto.categorias.push(cat);
-      showToast('Categoría "'+catTexto+'" creada', 'ok');
-    }
-    const categoriaId = cat.id;
     state.presupuesto.gastos.push({id:uid(), nombre, monto, categoriaId, fecha});
     saveState(); root.innerHTML=''; renderAll();
   };
@@ -2471,7 +2467,7 @@ function abrirFormularioConIA(data){
   const tipo = data.tipo, c = data.campos || {};
   if(tipo==='gasto'){
     const cat = state.presupuesto.categorias.find(x=> x.nombre.toLowerCase()===String(c.categoria||'').toLowerCase());
-    openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, categoriaNombre: cat?null:c.categoria, fecha:c.fecha });
+    openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, fecha:c.fecha });
   } else if(tipo==='actividad'){
     const fecha = c.fecha || dateKey(new Date());
     openActivityModal(fecha, null, null, { nombre:c.nombre, hora:c.hora, notas:c.notas, repite:c.repite });
@@ -2483,6 +2479,18 @@ function abrirFormularioConIA(data){
     openMedModal(null, { nombre:c.nombre, dosis:c.dosis, horarios:c.horarios });
   } else if(tipo==='categoria'){
     openCategoriaModal(null, { nombre:c.nombre, monto:c.monto });
+  } else if(tipo==='mercado'){
+    const nombreProducto = (c.nombre||'').trim();
+    if(!nombreProducto){ showToast('No logré entender qué producto era', 'error'); return; }
+    let prod = state.mercadoDefault.find(m=> m.nombre.toLowerCase()===nombreProducto.toLowerCase());
+    if(!prod){
+      prod = { id:uid(), nombre:nombreProducto, enCarrito:true, comprado:false };
+      state.mercadoDefault.push(prod);
+    } else {
+      prod.enCarrito = true;
+    }
+    saveState(); renderAll();
+    showToast(nombreProducto+' agregado al carrito', 'ok');
   } else {
     showToast('No logré entender eso, intenta de otra forma', 'error');
   }
