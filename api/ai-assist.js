@@ -62,7 +62,7 @@ module.exports = async (req, res) => {
       'Hoy es ' + hoy + ' (formato YYYY-MM-DD). Categorías de gasto ya existentes en la app: [' + listaCategorias + ']. ' +
       'Estos son los datos actuales guardados por esta persona (úsalos SOLO para responder preguntas, tipo "consulta"): ' + contextoJson + '. ' +
       'Responde SOLO con JSON válido, sin explicación ni texto adicional, con esta forma exacta: ' +
-      '{"tipo":"gasto|actividad|cumpleanos|pago|medicamento|categoria|mercado|consulta|desconocido","campos":{}}. ' +
+      '{"tipo":"gasto|actividad|cumpleanos|pago|medicamento|categoria|mercado|consulta|signos|desconocido","campos":{}}. ' +
       'Según el tipo, "campos" debe tener EXACTAMENTE estas llaves: ' +
       'gasto: nombre (string), monto (number, sin símbolos), categoria (el nombre más parecido de la lista de categorías existentes, o "" si ninguna calza), fecha (YYYY-MM-DD, hoy si no se menciona otra). ' +
       'actividad: nombre (string), fecha (YYYY-MM-DD, resolviendo días relativos como "mañana" o "el martes" respecto a hoy), hora (HH:MM en formato 24 horas, o null si no menciona hora), notas (string, puede ser ""), repite (true si describe algo que pasa todas las semanas ese día, false si es un evento puntual). ' +
@@ -72,6 +72,7 @@ module.exports = async (req, res) => {
       'categoria: usa este tipo SOLO si la persona pide explícitamente crear/agregar una categoría de presupuesto (ej: "crea la categoría transporte", "agrega una categoría de mascotas con 100 mil"). campos: nombre (string), monto (number, 0 si no menciona un monto). ' +
       'mercado: usa este tipo cuando la persona pide agregar algo a la lista o al carrito de mercado/compras (ej: "agrega atún al mercado", "pon leche en el carrito", "necesito comprar papel higiénico"). campos: nombre (string, el producto). ' +
       'consulta: usa este tipo cuando la persona hace una PREGUNTA sobre algo que ya tiene guardado (ej: "¿cuándo es el cumpleaños de Juan?", "¿cuánto llevo gastado en mercado?", "¿qué pagos me faltan?", "¿a qué hora me toca el losartán?"). Responde usando ÚNICAMENTE los datos del contexto de arriba — si no tienes esa información en el contexto, dilo claramente en vez de inventar. campos: {"respuesta": string} — una respuesta corta, hablada, en español natural, como si se la dijeras en voz alta a la persona (máximo 2-3 frases). ' +
+      'signos: usa este tipo cuando la persona quiera registrar un signo vital (presión arterial, frecuencia cardíaca, glicemia o peso) (ej: "mi presión hoy fue 120 sobre 80", "registra mi glicemia en 95", "mi peso es 68 kilos"). campos: sistolica (number o null), diastolica (number o null), fc (number o null, frecuencia cardíaca), glicemia (number o null), peso (number o null), fecha (YYYY-MM-DD, hoy si no se menciona otra). Deja en null cualquier valor que no se haya mencionado en la frase. ' +
       'Si la frase no calza claramente con ninguno de estos, responde tipo "desconocido" con campos vacío {}.';
 
     const chatRes = await fetch('https://api.openai.com/v1/chat/completions', {
