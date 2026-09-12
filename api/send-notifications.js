@@ -76,7 +76,7 @@ module.exports = async (req, res) => {
   webpush.setVapidDetails('mailto:nvelascop@ismm.edu.co', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
   try{
-    const subsRes = await fetch(SUPABASE_URL + '/rest/v1/aienda_push?select=user_id,subscription', {
+    const subsRes = await fetch(SUPABASE_URL + '/rest/v1/aienda_push?select=user_id,subscription,endpoint', {
       headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
     });
     const subs = await subsRes.json();
@@ -100,7 +100,7 @@ module.exports = async (req, res) => {
         enviados++;
       }catch(err){
         if(err.statusCode===410 || err.statusCode===404){
-          await fetch(SUPABASE_URL + '/rest/v1/aienda_push?user_id=eq.' + row.user_id, {
+          await fetch(SUPABASE_URL + '/rest/v1/aienda_push?endpoint=eq.' + encodeURIComponent(row.endpoint), {
             method: 'DELETE',
             headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
           });
