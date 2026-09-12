@@ -2498,12 +2498,40 @@ async function procesarTextoIA(texto, root, estadoEl){
       body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre), contexto: construirContextoIA() })
     });
     if(res.status===403){ root.innerHTML=''; showPaywallModal(); return; }
-    if(!res.ok){ if(estadoEl) estadoEl.textContent='No se pudo procesar. Intenta de nuevo.'; return; }
-    const data = await res.json();
+    if(!res.ok){
+      const msg = 'No se pudo procesar (código '+res.status+'). Intenta de nuevo.';
+      if(estadoEl && document.body.contains(estadoEl)) estadoEl.textContent = msg;
+      showToast(msg, 'error');
+      console.error('ai-assist respondió con error', res.status);
+      return;
+    }
+    let data;
+    try{ data = await res.json(); }
+    catch(parseErr){
+      const msg = 'La IA no respondió correctamente. Intenta de nuevo.';
+      if(estadoEl && document.body.contains(estadoEl)) estadoEl.textContent = msg;
+      showToast(msg, 'error');
+      console.error('No se pudo leer la respuesta de ai-assist', parseErr);
+      return;
+    }
+    if(!data || !data.tipo){
+      const msg = 'No logré entender eso, intenta de otra forma.';
+      if(estadoEl && document.body.contains(estadoEl)) estadoEl.textContent = msg;
+      showToast(msg, 'error');
+      return;
+    }
     root.innerHTML='';
-    abrirFormularioConIA(data);
+    try{
+      abrirFormularioConIA(data);
+    }catch(uiErr){
+      console.error('Error mostrando la respuesta de la IA', uiErr);
+      showToast('Ocurrió un problema mostrando la respuesta.', 'error');
+    }
   }catch(e){
-    if(estadoEl) estadoEl.textContent = 'Hubo un error. Intenta de nuevo.';
+    const msg = 'Hubo un error de conexión. Intenta de nuevo.';
+    if(estadoEl && document.body.contains(estadoEl)) estadoEl.textContent = msg;
+    showToast(msg, 'error');
+    console.error('Error de red al hablar con la IA', e);
   }
 }
 
