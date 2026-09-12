@@ -1253,16 +1253,17 @@ function renderPresupuesto(){
   });
 }
 
-function openCategoriaModal(existing){
+function openCategoriaModal(existing, prefill){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
+  const base = existing || prefill || {};
   modal.innerHTML = '<h3>'+(existing?'Editar categoría':'Nueva categoría')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
-      '<div class="frow"><label>Nombre</label><input id="cat-nombre" placeholder="Ej: Mercado" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
-      '<div class="frow"><label>Presupuesto mensual</label><input id="cat-monto" type="number" min="0" placeholder="Ej: 300000" value="'+(existing?existing.monto:'')+'"></div>'+
+      '<div class="frow"><label>Nombre</label><input id="cat-nombre" placeholder="Ej: Mercado" value="'+(base.nombre?esc(base.nombre):'')+'"></div>'+
+      '<div class="frow"><label>Presupuesto mensual</label><input id="cat-monto" type="number" min="0" placeholder="Ej: 300000" value="'+(base.monto||'')+'"></div>'+
     '</div>'+
     '<button class="close-btn" id="cat-save">Guardar categoría</button>';
   bg.appendChild(modal); root.appendChild(bg);
@@ -1283,14 +1284,8 @@ function openGastoModal(prefill){
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
   const cats = state.presupuesto.categorias;
-  if(cats.length===0){
-    modal.innerHTML = '<h3>Registrar gasto</h3>'+
-      '<p style="font-size:13.5px;color:var(--ink-soft);">Primero crea al menos una categoría en "+ Agregar categoría".</p>'+
-      '<button class="close-btn" id="gasto-cerrar">Cerrar</button>';
-    bg.appendChild(modal); root.appendChild(bg);
-    document.getElementById('gasto-cerrar').onclick = ()=>{ root.innerHTML=''; };
-    return;
-  }
+  const catActual = (prefill&&prefill.categoriaId&&cats.find(c=>c.id===prefill.categoriaId)) || null;
+  const catNombreInicial = catActual ? catActual.nombre : ((prefill&&prefill.categoriaNombre) || '');
   modal.innerHTML = '<h3>Registrar gasto</h3>'+
     (prefill?'<p style="font-size:12px;color:var(--ink-soft);margin-top:-8px;">✨ Revisa lo que entendí antes de guardar.</p>':'')+
     '<div class="form-card" style="border-style:solid;">'+
@@ -1300,10 +1295,12 @@ function openGastoModal(prefill){
       '</div>'+
       '<div class="form-two">'+
         '<div class="frow"><label>Monto</label><input id="gasto-monto" type="number" min="0" placeholder="Ej: 25000" value="'+(prefill&&prefill.monto?prefill.monto:'')+'"></div>'+
-        '<div class="frow"><label>Categoría</label><select id="gasto-categoria" class="settings-input">'+
-          cats.map(c=>'<option value="'+c.id+'"'+(prefill&&prefill.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
-        '</select></div>'+
+        '<div class="frow"><label>Categoría</label>'+
+          '<input id="gasto-categoria" class="settings-input" list="gasto-categoria-list" placeholder="Ej: Transporte" value="'+esc(catNombreInicial)+'">'+
+          '<datalist id="gasto-categoria-list">'+cats.map(c=>'<option value="'+esc(c.nombre)+'">').join('')+'</datalist>'+
+        '</div>'+
       '</div>'+
+      '<p style="font-size:12px;color:var(--ink-soft);margin-top:-6px;">Si escribes una categoría que no existe, la creamos sola con este gasto.</p>'+
       '<div class="frow"><label>Fecha</label><input id="gasto-fecha" type="date"></div>'+
     '</div>'+
     '<button class="close-btn" id="gasto-save">Guardar gasto</button>';
@@ -1313,9 +1310,17 @@ function openGastoModal(prefill){
   document.getElementById('gasto-save').onclick = ()=>{
     const nombre = document.getElementById('gasto-nombre').value.trim();
     const monto = parseFloat(document.getElementById('gasto-monto').value);
-    const categoriaId = document.getElementById('gasto-categoria').value;
+    const catTexto = document.getElementById('gasto-categoria').value.trim();
     const fecha = document.getElementById('gasto-fecha').value || dateKey(new Date());
     if(!nombre || isNaN(monto) || monto<=0) return;
+    if(!catTexto){ showToast('Escribe una categoría (nueva o existente)', 'error'); return; }
+    let cat = state.presupuesto.categorias.find(c=> c.nombre.toLowerCase()===catTexto.toLowerCase());
+    if(!cat){
+      cat = { id:uid(), nombre:catTexto, monto:0 };
+      state.presupuesto.categorias.push(cat);
+      showToast('Categoría "'+catTexto+'" creada', 'ok');
+    }
+    const categoriaId = cat.id;
     state.presupuesto.gastos.push({id:uid(), nombre, monto, categoriaId, fecha});
     saveState(); root.innerHTML=''; renderAll();
   };
@@ -1548,17 +1553,17 @@ function openActivityModal(dateKeyStr, existing, existingType, prefill){
   const horaActual = existing ? existing.hora : (prefill?prefill.hora:'');
   const notasActual = existing ? existing.notas : (prefill?prefill.notas:'');
   const hasHora = !!horaActual;
-  let repite = existing ? (existingType==='template') : (prefill?!!prefill.repite:true); // nuevo: por defecto se repite cada semana
+  let repite = existing ? (existingType==='template') : (prefill && typeof prefill.repite==='boolean' ? prefill.repite : null); // null = aún no ha elegido
   modal.innerHTML = '<h3>'+(existing?'Editar actividad':'Nueva actividad')+' — '+dname+' '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
         '<div style="flex:1;"><label>Nombre</label><input id="ac-nombre" placeholder="Ej: Ejercicio" value="'+esc(nombreActual)+'"></div>'+
         '<span id="ac-mic-holder"></span>'+
       '</div>'+
-      '<label style="font-size:12px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:6px;">¿Cuándo?</label>'+
+      '<label style="font-size:12px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:6px;">¿Cuándo? (elige una opción)</label>'+
       '<div class="rep-row">'+
-        '<button type="button" class="rep-btn'+(repite?' selected':'')+'" data-rep="1">Todas las semanas</button>'+
-        '<button type="button" class="rep-btn'+(!repite?' selected':'')+'" data-rep="0">Solo este día</button>'+
+        '<button type="button" class="rep-btn'+(repite===true?' selected':'')+'" data-rep="1">Todas las semanas</button>'+
+        '<button type="button" class="rep-btn'+(repite===false?' selected':'')+'" data-rep="0">Solo este día</button>'+
       '</div>'+
       '<label class="time-toggle-row"><input type="checkbox" id="ac-hora-toggle" '+(hasHora?'checked':'')+'> Agregar una hora específica</label>'+
       '<div class="time-picker '+(hasHora?'':'hidden')+'" id="ac-hora-picker"></div>'+
@@ -1582,6 +1587,7 @@ function openActivityModal(dateKeyStr, existing, existingType, prefill){
   document.getElementById('ac-save').onclick = ()=>{
     const nombre = document.getElementById('ac-nombre').value.trim();
     if(!nombre) return;
+    if(repite===null){ showToast('Elige si se repite cada semana o es solo este día', 'error'); return; }
     const hora = document.getElementById('ac-hora-toggle').checked ? acPicker.getValue() : '';
     const notas = document.getElementById('ac-notas').value.trim();
 
@@ -1934,7 +1940,8 @@ function renderMercadoDefault(){
     holder.innerHTML='<div class="empty-note">Aún no hay productos en la lista predeterminada.</div>';
     return;
   }
-  state.mercadoDefault.forEach(m=>{
+  const listaOrdenada = [...state.mercadoDefault].sort((a,b)=> a.nombre.localeCompare(b.nombre, 'es'));
+  listaOrdenada.forEach(m=>{
     if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
     const row=document.createElement('div');
     row.className='mkt-row';
@@ -2464,7 +2471,7 @@ function abrirFormularioConIA(data){
   const tipo = data.tipo, c = data.campos || {};
   if(tipo==='gasto'){
     const cat = state.presupuesto.categorias.find(x=> x.nombre.toLowerCase()===String(c.categoria||'').toLowerCase());
-    openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, fecha:c.fecha });
+    openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, categoriaNombre: cat?null:c.categoria, fecha:c.fecha });
   } else if(tipo==='actividad'){
     const fecha = c.fecha || dateKey(new Date());
     openActivityModal(fecha, null, null, { nombre:c.nombre, hora:c.hora, notas:c.notas, repite:c.repite });
@@ -2474,6 +2481,8 @@ function abrirFormularioConIA(data){
     openPagoModal(null, { nombre:c.nombre, dia:c.dia, frecuencia:c.frecuencia });
   } else if(tipo==='medicamento'){
     openMedModal(null, { nombre:c.nombre, dosis:c.dosis, horarios:c.horarios });
+  } else if(tipo==='categoria'){
+    openCategoriaModal(null, { nombre:c.nombre, monto:c.monto });
   } else {
     showToast('No logré entender eso, intenta de otra forma', 'error');
   }
