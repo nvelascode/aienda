@@ -254,6 +254,28 @@
     font-size:12.5px;cursor:pointer;padding:6px 2px 0;display:inline-flex;align-items:center;gap:4px;
   }
 
+  /* ---------- selector de hora (subir/bajar, deslizar) ---------- */
+  .time-toggle-row{ display:flex; align-items:center; gap:8px; margin:2px 0 9px; font-size:13px; font-weight:800; color:var(--ink-soft); }
+  .time-toggle-row input[type="checkbox"]{ width:18px; height:18px; accent-color:var(--moss); }
+  .time-picker{
+    display:flex; align-items:center; gap:8px; background:#FFFEFB;
+    border:1.5px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:9px; width:fit-content;
+  }
+  .tp-col{ display:flex; flex-direction:column; align-items:center; user-select:none; }
+  .tp-arrow{
+    border:none; background:var(--moss-light); color:var(--moss); font-size:12px; font-weight:800;
+    cursor:pointer; padding:2px 0; line-height:1.4; width:32px; border-radius:8px;
+  }
+  .tp-value{
+    font-family:'Fredoka',sans-serif; font-size:22px; font-weight:600; color:var(--ink);
+    min-width:38px; text-align:center; padding:3px 0; cursor:ns-resize; touch-action:none;
+  }
+  .tp-colon{ font-size:20px; font-weight:700; color:var(--ink-soft); }
+  .tp-ampm{
+    margin-left:6px; background:var(--yolk); color:#4A3410; font-weight:800; font-size:13px;
+    border-radius:10px; padding:9px 11px; cursor:pointer;
+  }
+
   /* ---------- pill buttons ---------- */
   .pill-btn{
     border:none;border-radius:999px;padding:10px 16px;
@@ -692,6 +714,85 @@ let saveTimer = null;
 
 function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
 
+/* ================= SELECTOR DE HORA (subir/bajar, deslizar, sin reloj) ================= */
+function createTimePicker(root, initial24h){
+  let hour24 = 9, minute = 0;
+  if(initial24h){
+    const parts = initial24h.split(':');
+    hour24 = parseInt(parts[0],10) || 0;
+    minute = parseInt(parts[1],10) || 0;
+  }
+  function to12(){
+    let h12 = hour24 % 12; if(h12===0) h12 = 12;
+    return { h12, period: hour24 < 12 ? 'AM' : 'PM' };
+  }
+  function to24(h12, period){
+    let h = h12 % 12;
+    if(period==='PM') h += 12;
+    return h;
+  }
+  function render(){
+    const { h12, period } = to12();
+    root.querySelector('.tp-hh').textContent = String(h12).padStart(2,'0');
+    root.querySelector('.tp-mm').textContent = String(minute).padStart(2,'0');
+    root.querySelector('.tp-ampm').textContent = period;
+  }
+  function changeHour(dir){
+    let { h12, period } = to12();
+    h12 += dir;
+    if(h12>12){ h12=1; period = period==='AM'?'PM':'AM'; }
+    if(h12<1){ h12=12; period = period==='AM'?'PM':'AM'; }
+    hour24 = to24(h12, period);
+    render();
+  }
+  function changeMinute(dir){
+    minute += dir*5;
+    if(minute>59) minute=0;
+    if(minute<0) minute=55;
+    render();
+  }
+  function togglePeriod(){
+    const { h12, period } = to12();
+    hour24 = to24(h12, period==='AM'?'PM':'AM');
+    render();
+  }
+  root.innerHTML =
+    '<div class="tp-col"><button type="button" class="tp-arrow" data-act="h+">▲</button><div class="tp-value tp-hh"></div><button type="button" class="tp-arrow" data-act="h-">▼</button></div>'+
+    '<div class="tp-colon">:</div>'+
+    '<div class="tp-col"><button type="button" class="tp-arrow" data-act="m+">▲</button><div class="tp-value tp-mm"></div><button type="button" class="tp-arrow" data-act="m-">▼</button></div>'+
+    '<div class="tp-ampm"></div>';
+  root.querySelector('[data-act="h+"]').onclick = ()=> changeHour(1);
+  root.querySelector('[data-act="h-"]').onclick = ()=> changeHour(-1);
+  root.querySelector('[data-act="m+"]').onclick = ()=> changeMinute(1);
+  root.querySelector('[data-act="m-"]').onclick = ()=> changeMinute(-1);
+  root.querySelector('.tp-ampm').onclick = togglePeriod;
+
+  function addDrag(el, onUp, onDown){
+    let startY = null;
+    el.addEventListener('touchstart', e=>{ startY = e.touches[0].clientY; }, {passive:true});
+    el.addEventListener('touchmove', e=>{
+      if(startY===null) return;
+      const dy = startY - e.touches[0].clientY;
+      if(Math.abs(dy) > 22){
+        if(dy>0) onUp(); else onDown();
+        startY = e.touches[0].clientY;
+      }
+    }, {passive:true});
+    el.addEventListener('touchend', ()=>{ startY = null; });
+    el.addEventListener('wheel', e=>{
+      e.preventDefault();
+      if(e.deltaY<0) onUp(); else onDown();
+    }, {passive:false});
+  }
+  addDrag(root.querySelector('.tp-hh'), ()=>changeHour(1), ()=>changeHour(-1));
+  addDrag(root.querySelector('.tp-mm'), ()=>changeMinute(1), ()=>changeMinute(-1));
+
+  render();
+  return {
+    getValue: ()=> String(hour24).padStart(2,'0')+':'+String(minute).padStart(2,'0'),
+  };
+}
+
 /* ================= DICTADO POR VOZ (Web Speech API — gratis, sin API key) ================= */
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 function makeMicButton(inputEl){
@@ -1070,14 +1171,15 @@ function buildDayItems(date){
   const dname = DAY_NAMES[(date.getDay()+6)%7];
   const key = dateKey(date);
   const out=[];
-  (state.templates[dname]||[]).forEach(t=> out.push({type:'template', id:t.id, texto:t.texto}));
-  const dayCompromisos = state.compromisos.filter(c=>c.date===key).slice().sort((a,b)=>{
+  (state.templates[dname]||[]).forEach(t=> out.push({type:'template', id:t.id, texto:t.texto, hora:t.hora||'', notas:t.notas||''}));
+  const dayCompromisos = state.compromisos.filter(c=>c.date===key);
+  dayCompromisos.forEach(c=> out.push({type:'compromiso', id:c.id, texto:c.nombre, hora:c.hora||'', notas:c.notas||''}));
+  out.sort((a,b)=>{
     if(!a.hora && !b.hora) return 0;
     if(!a.hora) return 1;   // sin hora, al final
     if(!b.hora) return -1;
     return a.hora.localeCompare(b.hora);
   });
-  dayCompromisos.forEach(c=> out.push({type:'compromiso', id:c.id, texto:c.nombre, hora:c.hora, notas:c.notas}));
   return out;
 }
 
@@ -1113,6 +1215,17 @@ function renderItemRow(it, dayKey){
     edit.onclick = ()=>{
       const c = state.compromisos.find(x=>x.id===it.id);
       openCompromisoModal(dayKey, c);
+    };
+    row.appendChild(edit);
+  }
+  if(it.type==='template'){
+    const edit = document.createElement('button');
+    edit.className='del-x'; edit.textContent='✏️';
+    edit.onclick = ()=>{
+      const dd = new Date(dayKey+'T00:00:00');
+      const dname = DAY_NAMES[(dd.getDay()+6)%7];
+      const t = state.templates[dname].find(x=>x.id===it.id);
+      openTemplateModal(dname, t);
     };
     row.appendChild(edit);
   }
@@ -1186,23 +1299,13 @@ function renderWeek(){
       items.forEach(it=> card.appendChild(renderItemRow(it,key)));
     }
 
-    // add activity (template) row
-    const addAct = document.createElement('div');
-    addAct.className='add-row';
-    const inpAct = document.createElement('input');
-    inpAct.placeholder='Nueva actividad de '+dname+'...';
-    const btnAct = document.createElement('button');
-    btnAct.className='add-btn'; btnAct.textContent='+';
-    btnAct.onclick = ()=>{
-      const val = inpAct.value.trim();
-      if(!val) return;
-      state.templates[dname].push({id:uid(), texto:val});
-      inpAct.value='';
-      saveState(); renderAll();
-    };
-    inpAct.addEventListener('keydown', e=>{ if(e.key==='Enter') btnAct.click(); });
-    addAct.appendChild(inpAct); addAct.appendChild(makeMicButton(inpAct)); addAct.appendChild(btnAct);
-    card.appendChild(addAct);
+    // add activity (template) — abre el mismo formulario completo (nombre, hora, notas)
+    const addActBtn = document.createElement('button');
+    addActBtn.className='pill-btn yolk';
+    addActBtn.style.cssText='width:100%;margin-top:9px;';
+    addActBtn.textContent='+ Agregar actividad';
+    addActBtn.onclick = ()=> openTemplateModal(dname);
+    card.appendChild(addActBtn);
 
     // add compromiso link
     const linkBtn = document.createElement('button');
@@ -1223,28 +1326,73 @@ function openCompromisoModal(dateKeyStr, existing){
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
+  const hasHora = !!(existing && existing.hora);
   modal.innerHTML = '<h3>'+(existing?'Editar compromiso':'Nuevo compromiso')+' — '+dname+' '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
         '<div style="flex:1;"><label>Nombre del compromiso</label><input id="cf-nombre" placeholder="Ej: Cita médica" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
         '<span id="cf-mic-holder"></span>'+
       '</div>'+
-      '<div class="frow"><label>Hora</label><input id="cf-hora" type="time" value="'+(existing&&existing.hora?existing.hora:'')+'"></div>'+
-      '<div class="frow"><label>Notas (opcional)</label><textarea id="cf-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
+      '<label class="time-toggle-row"><input type="checkbox" id="cf-hora-toggle" '+(hasHora?'checked':'')+'> Agregar una hora específica</label>'+
+      '<div class="time-picker '+(hasHora?'':'hidden')+'" id="cf-hora-picker"></div>'+
+      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="cf-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
     '</div>'+
     '<button class="close-btn" id="cf-save">Guardar compromiso</button>';
   bg.appendChild(modal); root.appendChild(bg);
   document.getElementById('cf-mic-holder').appendChild(makeMicButton(document.getElementById('cf-nombre')));
+  const cfPicker = createTimePicker(document.getElementById('cf-hora-picker'), (existing&&existing.hora)||'09:00');
+  document.getElementById('cf-hora-toggle').onchange = (e)=>{
+    document.getElementById('cf-hora-picker').classList.toggle('hidden', !e.target.checked);
+  };
 
   document.getElementById('cf-save').onclick = ()=>{
     const nombre = document.getElementById('cf-nombre').value.trim();
     if(!nombre) return;
-    const hora = document.getElementById('cf-hora').value;
+    const hora = document.getElementById('cf-hora-toggle').checked ? cfPicker.getValue() : '';
     const notas = document.getElementById('cf-notas').value.trim();
     if(existing){
       existing.nombre=nombre; existing.hora=hora; existing.notas=notas;
     } else {
       state.compromisos.push({id:uid(), date:dateKeyStr, nombre, hora, notas});
+    }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
+/* ================= NUEVA/EDITAR ACTIVIDAD (recurrente por día de la semana) ================= */
+function openTemplateModal(dname, existing){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const hasHora2 = !!(existing && existing.hora);
+  modal.innerHTML = '<h3>'+(existing?'Editar actividad':'Nueva actividad')+' — '+dname+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
+        '<div style="flex:1;"><label>Nombre de la actividad</label><input id="tf-nombre" placeholder="Ej: Ejercicio" value="'+(existing?esc(existing.texto):'')+'"></div>'+
+        '<span id="tf-mic-holder"></span>'+
+      '</div>'+
+      '<label class="time-toggle-row"><input type="checkbox" id="tf-hora-toggle" '+(hasHora2?'checked':'')+'> Agregar una hora específica</label>'+
+      '<div class="time-picker '+(hasHora2?'':'hidden')+'" id="tf-hora-picker"></div>'+
+      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="tf-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
+    '</div>'+
+    '<button class="close-btn" id="tf-save">Guardar actividad</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('tf-mic-holder').appendChild(makeMicButton(document.getElementById('tf-nombre')));
+  const tfPicker = createTimePicker(document.getElementById('tf-hora-picker'), (existing&&existing.hora)||'09:00');
+  document.getElementById('tf-hora-toggle').onchange = (e)=>{
+    document.getElementById('tf-hora-picker').classList.toggle('hidden', !e.target.checked);
+  };
+  document.getElementById('tf-save').onclick = ()=>{
+    const texto = document.getElementById('tf-nombre').value.trim();
+    if(!texto) return;
+    const hora = document.getElementById('tf-hora-toggle').checked ? tfPicker.getValue() : '';
+    const notas = document.getElementById('tf-notas').value.trim();
+    if(existing){
+      existing.texto=texto; existing.hora=hora; existing.notas=notas;
+    } else {
+      state.templates[dname].push({id:uid(), texto, hora, notas});
     }
     saveState(); root.innerHTML=''; renderAll();
   };
@@ -2074,15 +2222,15 @@ function openSettingsModal(){
     '<div class="settings-subtitle">Tamaño de letra</div>'+
     '<div class="textsize-row">'+textSizeBtns+'</div>'+
     '<div class="settings-subtitle">Pestañas</div>'+
-    '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas una, su información se guarda igual, solo deja de verse.</p>'+
+    '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas alguna pestaña, tu información no se pierde, solamente deja de ser visible.</p>'+
     '<div class="settings-group">'+rows+'</div>'+
-    '<div class="settings-subtitle">Ubicación del clima</div>'+
+    '<div class="settings-subtitle">Clima</div>'+
+    '<label class="settings-row"><span>🌤️ Mostrar barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
     '<div class="frow" style="display:flex;gap:8px;align-items:flex-start;">'+
       '<input id="settings-city" class="settings-input" placeholder="Ej: Medellín, Cali..." style="flex:1;">'+
       '<button class="pill-btn yolk" id="settings-city-save" style="white-space:nowrap;">Buscar</button>'+
     '</div>'+
-    '<p style="font-size:12px;color:var(--ink-soft);margin-top:-4px;">Ciudad actual: <span id="settings-city-current">'+esc((state.settings.weatherLocation&&state.settings.weatherLocation.name)||'Bogotá')+'</span></p>'+
-    '<label class="settings-row"><span>🌤️ Barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
+    '<p style="font-size:12px;color:var(--ink-soft);margin-top:-4px;margin-bottom:12px;">Ciudad actual: <span id="settings-city-current">'+esc((state.settings.weatherLocation&&state.settings.weatherLocation.name)||'Bogotá')+'</span></p>'+
     '<label class="settings-row"><span>🎤 Dictado por voz</span><input type="checkbox" id="settings-mic" '+(state.settings.micEnabled?'checked':'')+'></label>'+
     '<label class="settings-row"><span>🔔 Notificaciones push</span><input type="checkbox" id="settings-push" '+(state.settings.pushEnabled?'checked':'')+'></label>'+
     '<button class="close-btn" id="settings-close">Cerrar</button>';
