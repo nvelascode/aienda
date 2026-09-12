@@ -29,6 +29,7 @@
     --ink:#3A2E22;
     --ink-soft:#7A6C5D;
     --line:#EADFC4;
+    --input-bg:#FFFEFB;
   }
   body.dark-mode{
     --cream:#221D18;
@@ -40,6 +41,7 @@
     --ink-soft:#C9BBA8;
     --line:#453B31;
     --sky:#8FC1CC;
+    --input-bg:#3A3025;
   }
   body.dark-mode .greet-card{ box-shadow:0 10px 24px -12px rgba(0,0,0,.6); }
   body.dark-mode .modal-bg{ background:rgba(0,0,0,.65); }
@@ -95,7 +97,7 @@
     width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer;transition:background .2s;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;color-scheme:light;}
   body{
     font-family:'Nunito',sans-serif;
     background:var(--cream);
@@ -229,7 +231,7 @@
   .add-row input{
     flex:1;border:1.5px solid var(--line);border-radius:12px;
     padding:9px 11px;font-size:13.5px;font-family:inherit;font-weight:700;
-    background:#FFFEFB;color:var(--ink);
+    background:var(--input-bg);color:var(--ink);
   }
   .add-row input:focus{outline:none;border-color:var(--yolk-dark);}
   .add-btn{
@@ -259,7 +261,7 @@
   .time-toggle-row{ display:flex; align-items:center; gap:8px; margin:2px 0 9px; font-size:13px; font-weight:800; color:var(--ink-soft); }
   .time-toggle-row input[type="checkbox"]{ width:18px; height:18px; accent-color:var(--moss); }
   .time-picker{
-    display:flex; align-items:center; gap:8px; background:#FFFEFB;
+    display:flex; align-items:center; gap:8px; background:var(--input-bg);
     border:1.5px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:9px; width:fit-content;
   }
   .tp-col{ display:flex; flex-direction:column; align-items:center; user-select:none; }
@@ -282,6 +284,26 @@
     padding:9px 6px; cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:600; font-size:13px; color:var(--ink);
   }
   .rep-btn.selected{ border-color:var(--yolk-dark); background:var(--moss-light); }
+
+  /* ---------- botón flotante de IA ---------- */
+  .ai-fab{
+    position:fixed; right:18px; bottom:96px; width:52px; height:52px; border-radius:50%;
+    background:var(--yolk); color:#4A3410; border:none; font-size:22px; cursor:pointer;
+    box-shadow:0 6px 16px -4px rgba(0,0,0,.35); z-index:30; display:flex; align-items:center; justify-content:center;
+  }
+  .ai-fab.hidden{ display:none !important; }
+
+  /* ---------- presupuesto ---------- */
+  .budget-card{
+    background:var(--shell); border:1px solid var(--line); border-radius:18px;
+    padding:14px 16px; margin-bottom:10px;
+  }
+  .budget-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .budget-name{ font-family:'Fredoka',sans-serif; font-weight:600; font-size:15px; }
+  .budget-amounts{ font-size:12.5px; color:var(--ink-soft); font-weight:700; white-space:nowrap; }
+  .budget-bar-track{ background:var(--line); border-radius:999px; height:10px; overflow:hidden; }
+  .budget-bar-fill{ height:100%; border-radius:999px; background:var(--moss); transition:width .3s ease; }
+  .budget-bar-fill.over{ background:var(--brick); }
 
   /* ---------- pill buttons ---------- */
   .pill-btn{
@@ -312,7 +334,7 @@
   .form-card input, .form-card select, .form-card textarea{
     width:100%;border:1.5px solid var(--line);border-radius:11px;
     padding:9px 11px;font-size:14px;font-family:inherit;font-weight:700;color:var(--ink);
-    background:#FFFEFB;
+    background:var(--input-bg);
   }
   .form-card input:focus,.form-card select:focus,.form-card textarea:focus{outline:none;border-color:var(--yolk-dark);}
   .form-two{display:flex;gap:9px;}
@@ -390,7 +412,7 @@
   .settings-input{
     width:100%;border:1.5px solid var(--line);border-radius:11px;
     padding:9px 11px;font-size:14px;font-family:inherit;font-weight:700;color:var(--ink);
-    background:#FFFEFB;
+    background:var(--input-bg);
   }
   .settings-input:focus{outline:none;border-color:var(--yolk-dark);}
 
@@ -553,6 +575,22 @@
     </div>
   </div>
 
+  <!-- PRESUPUESTO -->
+  <div id="tab-presupuesto" class="tabpanel hidden">
+    <div class="section-title">
+      Categorías
+      <button class="pill-btn yolk" id="btn-toggle-edit-presupuesto">✏️ Editar</button>
+    </div>
+    <div id="presupuesto-categorias"></div>
+    <button class="pill-btn yolk hidden" id="btn-add-categoria" style="width:100%;margin-top:8px;">+ Agregar categoría</button>
+
+    <div class="section-title" style="margin-top:26px;">
+      Gastos de este mes
+      <button class="pill-btn moss" id="btn-add-gasto">+ Registrar gasto</button>
+    </div>
+    <div id="presupuesto-gastos"></div>
+  </div>
+
   <!-- MEDICAMENTOS -->
   <div id="tab-medicamentos" class="tabpanel hidden">
     <div class="section-title">💊 Hoy</div>
@@ -606,11 +644,13 @@
   <button class="tab-btn" data-tab="cumple"><span class="ic">🎂</span>Cumpleaños<span class="tab-dot hidden" id="dot-cumple"></span></button>
   <button class="tab-btn" data-tab="pagos"><span class="ic">💳</span>Pagos<span class="tab-dot hidden" id="dot-pagos"></span></button>
   <button class="tab-btn" data-tab="mercado"><span class="ic">🛒</span>Mercado</button>
+  <button class="tab-btn" data-tab="presupuesto"><span class="ic">💰</span>Presupuesto<span class="tab-dot hidden" id="dot-presupuesto"></span></button>
   <button class="tab-btn" data-tab="medicamentos"><span class="ic">💊</span>Medic.<span class="tab-dot hidden" id="dot-medicamentos"></span></button>
   <button class="tab-btn" data-tab="signos"><span class="ic">🩺</span>Signos</button>
 </div>
 
 <div id="modal-root"></div>
+<button class="ai-fab hidden" id="ai-fab" title="Asistente de IA">✨</button>
 </div><!-- /app-root -->
 
 <script>
@@ -665,6 +705,7 @@ const TAB_DEFS = [
   {key:'cumple',       label:'Cumpleaños',    icon:'🎂'},
   {key:'pagos',        label:'Pagos',         icon:'💳'},
   {key:'mercado',      label:'Mercado',       icon:'🛒'},
+  {key:'presupuesto',  label:'Presupuesto',   icon:'💰'},
   {key:'medicamentos', label:'Medicamentos',  icon:'💊'},
   {key:'signos',       label:'Signos vitales',icon:'🩺'},
 ];
@@ -680,12 +721,13 @@ function blankState(){
     pagos:[],              // { id, nombre, dia } — el usuario agrega los suyos
     pagosStatus:{},       // { pagoId: { 'YYYY-MM': true } }
     mercadoDefault:[],     // { id, nombre, enCarrito, comprado } — el usuario arma su propia lista
+    presupuesto:{ categorias:[], gastos:[] }, // categorias: {id,nombre,monto}; gastos: {id,categoriaId,nombre,monto,fecha}
     medicamentos:[],      // { id, nombre, dosis, horarios:['08:00','14:00'] }
     medsStatus:{},         // { 'YYYY-MM-DD': { 'medId|hora': true } }
     signosVitales:[],      // { id, fecha:'YYYY-MM-DD', hora:'HH:MM', sistolica, diastolica, fc, glicemia, peso, otros:{metricaId:valor} }
     signosMetricas:[],      // { id, nombre, unidad } — métricas personalizadas adicionales (ej: TSH, Colesterol)
     settings:{
-      tabs:{ actividades:true, cumple:true, pagos:true, mercado:true, medicamentos:false, signos:false }, // qué pestañas se muestran (el contenido nunca se borra al desactivar)
+      tabs:{ actividades:true, cumple:true, pagos:true, mercado:true, presupuesto:true, medicamentos:false, signos:false }, // qué pestañas se muestran (el contenido nunca se borra al desactivar)
       weatherEnabled:true,
       micEnabled:false, // dictado por voz — apagado por defecto, se activa desde Configuración
       pushEnabled:false, // notificaciones push — apagadas por defecto, se activan desde Configuración
@@ -694,6 +736,7 @@ function blankState(){
       appName:'Aienda',
       nameSet:false, // se vuelve true cuando la persona escribe su nombre en la bienvenida
       weatherLocation:{ name:'Bogotá', lat:4.7110, lon:-74.0721 }, // ciudad usada para el widget de clima
+      aiEnabled:false, // asistente de IA — se activa desde Configuración, requiere acceso autorizado
       textScale:1 // 1 = tamaño estándar; se puede aumentar desde Configuración
     }
   };
@@ -704,6 +747,7 @@ let state = blankState();
 let activitiesWeekStart = getMonday(new Date()); // referencia de semana para la pestaña Actividades (independiente de "hoy")
 let editModePagos = false;
 let editModeMercado = false;
+let editModePresupuesto = false;
 let darkOverride = null; // null = automático según la hora; true/false = forzado a mano por el botón
 
 /* ================= MODO OSCURO (automático 7pm–6am, con botón para forzarlo) ================= */
@@ -915,7 +959,7 @@ async function onLoggedIn(user){
   await loadState();
   hideAuthScreen();
   applyDarkMode(); applyPersonalization(); applyTextScale();
-  applyTabVisibility(); applyWeatherVisibility(); applyMicVisibility();
+  applyTabVisibility(); applyWeatherVisibility(); applyMicVisibility(); applyAIVisibility();
   renderAll(); renderSvOtrosFields(); renderMetricasChips();
   loadWeather();
   refreshAccountInfo();
@@ -1121,6 +1165,162 @@ function pagoNeedsAlert(info){
   return info.diffDays===3 || info.diffDays===0;
 }
 
+/* ================= PRESUPUESTO ================= */
+function formatMoney(n){
+  return '$'+Math.round(n||0).toLocaleString('es-CO');
+}
+function gastosDelMes(){
+  const key = new Date().getFullYear()+'-'+pad(new Date().getMonth()+1);
+  return state.presupuesto.gastos.filter(g=> g.fecha && g.fecha.startsWith(key));
+}
+function totalGastadoCategoria(catId){
+  return gastosDelMes().filter(g=>g.categoriaId===catId).reduce((s,g)=> s+(parseFloat(g.monto)||0), 0);
+}
+
+function renderPresupuesto(){
+  const holder = document.getElementById('presupuesto-categorias');
+  if(!holder) return;
+  holder.innerHTML='';
+  const cats = state.presupuesto.categorias;
+  let totalPresupuestado=0, totalGastado=0;
+  cats.forEach(c=>{
+    if(pendingDeletes[c.id]){ holder.appendChild(pendingDeleteRow(c.id, c.nombre)); return; }
+    const gastado = totalGastadoCategoria(c.id);
+    totalPresupuestado += (parseFloat(c.monto)||0);
+    totalGastado += gastado;
+    const pct = c.monto>0 ? Math.min(100, Math.round((gastado/c.monto)*100)) : 0;
+    const over = gastado > c.monto;
+    const card = document.createElement('div');
+    card.className='budget-card';
+    card.innerHTML = '<div class="budget-top"><span class="budget-name">'+esc(c.nombre)+'</span><span class="budget-amounts">'+formatMoney(gastado)+' / '+formatMoney(c.monto)+'</span></div>'+
+      '<div class="budget-bar-track"><div class="budget-bar-fill'+(over?' over':'')+'" style="width:'+pct+'%;"></div></div>';
+    if(editModePresupuesto){
+      const actions=document.createElement('div');
+      actions.style.cssText='display:flex;gap:8px;margin-top:8px;';
+      const editBtn=document.createElement('button');
+      editBtn.className='link-btn'; editBtn.style.padding='0'; editBtn.textContent='✏️ Editar';
+      editBtn.onclick=()=> openCategoriaModal(c);
+      actions.appendChild(editBtn);
+      const delBtn=document.createElement('button');
+      delBtn.className='link-btn'; delBtn.style.cssText='padding:0;color:var(--brick);'; delBtn.textContent='✕ Eliminar';
+      delBtn.onclick=()=> scheduleDelete(c.id, c.nombre, ()=>{
+        state.presupuesto.categorias = state.presupuesto.categorias.filter(x=>x.id!==c.id);
+        state.presupuesto.gastos = state.presupuesto.gastos.filter(g=>g.categoriaId!==c.id);
+        saveState();
+      });
+      actions.appendChild(delBtn);
+      card.appendChild(actions);
+    }
+    holder.appendChild(card);
+  });
+  if(cats.length===0){
+    holder.innerHTML = '<div class="empty-note">Aún no hay categorías. Toca "+ Agregar categoría" para empezar.</div>';
+  } else {
+    const resumen = document.createElement('div');
+    resumen.className='budget-card';
+    resumen.style.borderStyle='dashed';
+    const pctTotal = totalPresupuestado>0 ? Math.min(100, Math.round((totalGastado/totalPresupuestado)*100)) : 0;
+    resumen.innerHTML = '<div class="budget-top"><span class="budget-name">Total del mes</span><span class="budget-amounts">'+formatMoney(totalGastado)+' / '+formatMoney(totalPresupuestado)+'</span></div>'+
+      '<div class="budget-bar-track"><div class="budget-bar-fill'+(totalGastado>totalPresupuestado?' over':'')+'" style="width:'+pctTotal+'%;"></div></div>';
+    holder.insertBefore(resumen, holder.firstChild);
+  }
+
+  const gholder = document.getElementById('presupuesto-gastos');
+  gholder.innerHTML='';
+  const gastos = gastosDelMes().slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  if(gastos.length===0){
+    gholder.innerHTML = '<div class="empty-note">Aún no hay gastos registrados este mes.</div>';
+    return;
+  }
+  gastos.forEach(g=>{
+    if(pendingDeletes[g.id]){ gholder.appendChild(pendingDeleteRow(g.id, g.nombre)); return; }
+    const cat = state.presupuesto.categorias.find(c=>c.id===g.categoriaId);
+    const d = new Date(g.fecha+'T00:00:00');
+    const row=document.createElement('div');
+    row.className='pago-card';
+    row.innerHTML = '<div class="pago-top"><div><div class="pago-name">'+esc(g.nombre)+'</div>'+
+      '<div class="pago-day">'+(cat?esc(cat.nombre)+' · ':'')+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</div></div>'+
+      '<span class="badge ok">'+formatMoney(g.monto)+'</span></div>';
+    const del=document.createElement('button');
+    del.className='link-btn'; del.style.cssText='padding:0;color:var(--brick);';
+    del.textContent='✕ Eliminar';
+    del.onclick=()=> scheduleDelete(g.id, g.nombre, ()=>{
+      state.presupuesto.gastos = state.presupuesto.gastos.filter(x=>x.id!==g.id);
+      saveState();
+    });
+    row.appendChild(del);
+    gholder.appendChild(row);
+  });
+}
+
+function openCategoriaModal(existing){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>'+(existing?'Editar categoría':'Nueva categoría')+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow"><label>Nombre</label><input id="cat-nombre" placeholder="Ej: Mercado" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+      '<div class="frow"><label>Presupuesto mensual</label><input id="cat-monto" type="number" min="0" placeholder="Ej: 300000" value="'+(existing?existing.monto:'')+'"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="cat-save">Guardar categoría</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('cat-save').onclick = ()=>{
+    const nombre = document.getElementById('cat-nombre').value.trim();
+    const monto = parseFloat(document.getElementById('cat-monto').value);
+    if(!nombre || isNaN(monto) || monto<0) return;
+    if(existing){ existing.nombre=nombre; existing.monto=monto; }
+    else { state.presupuesto.categorias.push({id:uid(), nombre, monto}); }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
+function openGastoModal(prefill){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const cats = state.presupuesto.categorias;
+  if(cats.length===0){
+    modal.innerHTML = '<h3>Registrar gasto</h3>'+
+      '<p style="font-size:13.5px;color:var(--ink-soft);">Primero crea al menos una categoría en "+ Agregar categoría".</p>'+
+      '<button class="close-btn" id="gasto-cerrar">Cerrar</button>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('gasto-cerrar').onclick = ()=>{ root.innerHTML=''; };
+    return;
+  }
+  modal.innerHTML = '<h3>Registrar gasto</h3>'+
+    (prefill?'<p style="font-size:12px;color:var(--ink-soft);margin-top:-8px;">✨ Revisa lo que entendí antes de guardar.</p>':'')+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
+        '<div style="flex:1;"><label>¿En qué?</label><input id="gasto-nombre" placeholder="Ej: Almuerzo" value="'+(prefill&&prefill.nombre?esc(prefill.nombre):'')+'"></div>'+
+        '<span id="gasto-mic-holder"></span>'+
+      '</div>'+
+      '<div class="form-two">'+
+        '<div class="frow"><label>Monto</label><input id="gasto-monto" type="number" min="0" placeholder="Ej: 25000" value="'+(prefill&&prefill.monto?prefill.monto:'')+'"></div>'+
+        '<div class="frow"><label>Categoría</label><select id="gasto-categoria" class="settings-input">'+
+          cats.map(c=>'<option value="'+c.id+'"'+(prefill&&prefill.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
+        '</select></div>'+
+      '</div>'+
+      '<div class="frow"><label>Fecha</label><input id="gasto-fecha" type="date"></div>'+
+    '</div>'+
+    '<button class="close-btn" id="gasto-save">Guardar gasto</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('gasto-mic-holder').appendChild(makeMicButton(document.getElementById('gasto-nombre')));
+  document.getElementById('gasto-fecha').value = (prefill&&prefill.fecha) || dateKey(new Date());
+  document.getElementById('gasto-save').onclick = ()=>{
+    const nombre = document.getElementById('gasto-nombre').value.trim();
+    const monto = parseFloat(document.getElementById('gasto-monto').value);
+    const categoriaId = document.getElementById('gasto-categoria').value;
+    const fecha = document.getElementById('gasto-fecha').value || dateKey(new Date());
+    if(!nombre || isNaN(monto) || monto<=0) return;
+    state.presupuesto.gastos.push({id:uid(), nombre, monto, categoriaId, fecha});
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
 /* ================= RENDER: ALERTS (home) ================= */
 function renderAlerts(){
   const today = new Date();
@@ -1179,10 +1379,17 @@ function renderAlerts(){
     }
   }
 
+  let hasPresAlert=false;
+  if(state.settings.tabs.presupuesto){
+    hasPresAlert = state.presupuesto.categorias.some(c=> (parseFloat(c.monto)||0)>0 && totalGastadoCategoria(c.id) > (parseFloat(c.monto)||0));
+  }
+
   document.getElementById('dot-cumple').classList.toggle('hidden', !hasCumpleAlert);
   document.getElementById('dot-pagos').classList.toggle('hidden', !hasPagoAlert);
   const dotMed = document.getElementById('dot-medicamentos');
   if(dotMed) dotMed.classList.toggle('hidden', !hasMedAlert);
+  const dotPres = document.getElementById('dot-presupuesto');
+  if(dotPres) dotPres.classList.toggle('hidden', !hasPresAlert);
 }
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
@@ -1329,7 +1536,7 @@ function renderWeek(){
 }
 
 /* ================= NUEVA/EDITAR ACTIVIDAD (elige repetir cada semana o solo ese día) ================= */
-function openActivityModal(dateKeyStr, existing, existingType){
+function openActivityModal(dateKeyStr, existing, existingType, prefill){
   const d = new Date(dateKeyStr+'T00:00:00');
   const dname = DAY_NAMES[(d.getDay()+6)%7];
   const root = document.getElementById('modal-root');
@@ -1337,9 +1544,11 @@ function openActivityModal(dateKeyStr, existing, existingType){
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
-  const nombreActual = existing ? (existingType==='template' ? existing.texto : existing.nombre) : '';
-  const hasHora = !!(existing && existing.hora);
-  let repite = existing ? (existingType==='template') : true; // nuevo: por defecto se repite cada semana
+  const nombreActual = existing ? (existingType==='template' ? existing.texto : existing.nombre) : (prefill&&prefill.nombre?prefill.nombre:'');
+  const horaActual = existing ? existing.hora : (prefill?prefill.hora:'');
+  const notasActual = existing ? existing.notas : (prefill?prefill.notas:'');
+  const hasHora = !!horaActual;
+  let repite = existing ? (existingType==='template') : (prefill?!!prefill.repite:true); // nuevo: por defecto se repite cada semana
   modal.innerHTML = '<h3>'+(existing?'Editar actividad':'Nueva actividad')+' — '+dname+' '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
@@ -1353,12 +1562,12 @@ function openActivityModal(dateKeyStr, existing, existingType){
       '</div>'+
       '<label class="time-toggle-row"><input type="checkbox" id="ac-hora-toggle" '+(hasHora?'checked':'')+'> Agregar una hora específica</label>'+
       '<div class="time-picker '+(hasHora?'':'hidden')+'" id="ac-hora-picker"></div>'+
-      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="ac-notas" rows="2" placeholder="Detalles...">'+(existing&&existing.notas?esc(existing.notas):'')+'</textarea></div>'+
+      '<div class="frow" style="margin-top:9px;"><label>Notas (opcional)</label><textarea id="ac-notas" rows="2" placeholder="Detalles...">'+(notasActual?esc(notasActual):'')+'</textarea></div>'+
     '</div>'+
     '<button class="close-btn" id="ac-save">Guardar</button>';
   bg.appendChild(modal); root.appendChild(bg);
   document.getElementById('ac-mic-holder').appendChild(makeMicButton(document.getElementById('ac-nombre')));
-  const acPicker = createTimePicker(document.getElementById('ac-hora-picker'), (existing&&existing.hora)||'09:00');
+  const acPicker = createTimePicker(document.getElementById('ac-hora-picker'), horaActual||'09:00');
   document.getElementById('ac-hora-toggle').onchange = (e)=>{
     document.getElementById('ac-hora-picker').classList.toggle('hidden', !e.target.checked);
   };
@@ -1400,7 +1609,7 @@ function openActivityModal(dateKeyStr, existing, existingType){
 }
 
 /* ================= RENDER: CUMPLEAÑOS ================= */
-function openBdayModal(existing){
+function openBdayModal(existing, prefill){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
@@ -1409,13 +1618,13 @@ function openBdayModal(existing){
   modal.innerHTML = '<h3>'+(existing?'Editar cumpleaños':'Nuevo cumpleaños')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><label>Nombre</label><input id="bf-nombre" placeholder="Nombre" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+        '<div style="flex:1;"><label>Nombre</label><input id="bf-nombre" placeholder="Nombre" value="'+(existing?esc(existing.nombre):(prefill&&prefill.nombre?esc(prefill.nombre):''))+'"></div>'+
         '<span id="bf-mic-holder"></span>'+
       '</div>'+
       '<div class="form-two">'+
-        '<div class="frow"><label>Día</label><input id="bf-dia" type="number" min="1" max="31" placeholder="Día" value="'+(existing?existing.dia:'')+'"></div>'+
+        '<div class="frow"><label>Día</label><input id="bf-dia" type="number" min="1" max="31" placeholder="Día" value="'+(existing?existing.dia:(prefill&&prefill.dia?prefill.dia:''))+'"></div>'+
         '<div class="frow"><label>Mes</label>'+
-          '<select id="bf-mes">'+MONTH_NAMES.map((m,i)=>'<option value="'+(i+1)+'"'+(existing&&existing.mes===(i+1)?' selected':'')+'>'+m+'</option>').join('')+'</select>'+
+          '<select id="bf-mes">'+MONTH_NAMES.map((m,i)=>'<option value="'+(i+1)+'"'+((existing&&existing.mes===(i+1))||(!existing&&prefill&&prefill.mes===(i+1))?' selected':'')+'>'+m+'</option>').join('')+'</select>'+
         '</div>'+
       '</div>'+
       '<div class="frow"><label>Notas (opcional)</label><input id="bf-notas" placeholder="Ej: regalo, restaurante..." value="'+(existing&&existing.notas?esc(existing.notas):'')+'"></div>'+
@@ -1534,17 +1743,18 @@ function renderPagos(){
   });
 }
 
-function openPagoModal(existing){
+function openPagoModal(existing, prefill){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
-  const esBimestral = existing && existing.frecuencia==='bimestral';
+  const base = existing || prefill || {};
+  const esBimestral = base.frecuencia==='bimestral';
   modal.innerHTML = '<h3>'+(existing?'Editar pago':'Nuevo pago')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
-      '<div class="frow"><label>Nombre del pago</label><input id="pf-nombre" placeholder="Ej: Seguro carro" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
-      '<div class="frow"><label>Día del mes en que vence</label><input id="pf-dia" type="number" min="1" max="31" value="'+(existing?existing.dia:'')+'"></div>'+
+      '<div class="frow"><label>Nombre del pago</label><input id="pf-nombre" placeholder="Ej: Seguro carro" value="'+(base.nombre?esc(base.nombre):'')+'"></div>'+
+      '<div class="frow"><label>Día del mes en que vence</label><input id="pf-dia" type="number" min="1" max="31" value="'+(base.dia||'')+'"></div>'+
       '<div class="frow"><label>Frecuencia</label>'+
         '<select id="pf-frecuencia" class="settings-input">'+
           '<option value="mensual"'+(!esBimestral?' selected':'')+'>Cada mes</option>'+
@@ -1554,7 +1764,7 @@ function openPagoModal(existing){
       '<div class="frow'+(esBimestral?'':' hidden')+'" id="pf-mesinicio-row">'+
         '<label>Uno de los meses en que cae</label>'+
         '<select id="pf-mesinicio" class="settings-input">'+
-          MONTH_NAMES.map((mn,i)=>'<option value="'+i+'"'+(existing&&existing.mesInicio===i?' selected':'')+'>'+mn+'</option>').join('')+
+          MONTH_NAMES.map((mn,i)=>'<option value="'+i+'"'+(base.mesInicio===i?' selected':'')+'>'+mn+'</option>').join('')+
         '</select>'+
       '</div>'+
     '</div>'+
@@ -1655,20 +1865,21 @@ function renderMedsList(){
   });
 }
 
-function openMedModal(existing){
+function openMedModal(existing, prefill){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
+  const base = existing || prefill || {};
   modal.innerHTML = '<h3>'+(existing?'Editar medicamento':'Nuevo medicamento')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><label>Nombre</label><input id="mf-nombre" placeholder="Ej: Losartán" value="'+(existing?esc(existing.nombre):'')+'"></div>'+
+        '<div style="flex:1;"><label>Nombre</label><input id="mf-nombre" placeholder="Ej: Losartán" value="'+(base.nombre?esc(base.nombre):'')+'"></div>'+
         '<span id="mf-mic-holder"></span>'+
       '</div>'+
-      '<div class="frow"><label>Dosis (opcional)</label><input id="mf-dosis" placeholder="Ej: 50mg, 1 tableta" value="'+(existing&&existing.dosis?esc(existing.dosis):'')+'"></div>'+
-      '<div class="frow"><label>Horarios (separados por coma)</label><input id="mf-horarios" placeholder="Ej: 08:00, 14:00, 20:00" value="'+(existing?esc((existing.horarios||[]).join(', ')):'')+'"></div>'+
+      '<div class="frow"><label>Dosis (opcional)</label><input id="mf-dosis" placeholder="Ej: 50mg, 1 tableta" value="'+(base.dosis?esc(base.dosis):'')+'"></div>'+
+      '<div class="frow"><label>Horarios (separados por coma)</label><input id="mf-horarios" placeholder="Ej: 08:00, 14:00, 20:00" value="'+(esc((base.horarios||[]).join(', ')))+'"></div>'+
     '</div>'+
     '<button class="close-btn" id="mf-save">Guardar medicamento</button>';
   bg.appendChild(modal); root.appendChild(bg);
@@ -1764,6 +1975,7 @@ function renderAll(){
   renderPagos();
   renderMercadoCart();
   renderMercadoDefault();
+  renderPresupuesto();
   renderMedsToday();
   renderMedsList();
   renderSignosList();
@@ -2152,6 +2364,121 @@ function applyMicVisibility(){
   document.querySelectorAll('.mic-btn').forEach(b=> b.classList.toggle('hidden', !state.settings.micEnabled));
 }
 
+/* ================= ASISTENTE DE IA (beta, solo cuentas autorizadas) ================= */
+function applyAIVisibility(){
+  document.getElementById('ai-fab').classList.toggle('hidden', !state.settings.aiEnabled);
+}
+
+async function checkAIAccess(){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token = session && session.access_token;
+    if(!token) return false;
+    const res = await fetch('/api/ai-check', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token })
+    });
+    if(!res.ok) return false;
+    const data = await res.json();
+    return !!data.allowed;
+  }catch(e){ return false; }
+}
+
+function showPaywallModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>✨ Asistente de IA</h3>'+
+    '<p style="font-size:14px;color:var(--ink-soft);">Esta función hace parte del plan pago de Aienda. Muy pronto vas a poder suscribirte directamente desde aquí.</p>'+
+    '<button class="close-btn" id="paywall-close">Entendido</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('paywall-close').onclick = ()=>{ root.innerHTML=''; };
+}
+
+function openAIModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>✨ Dime qué necesitas</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
+        '<div style="flex:1;"><input id="ai-input" placeholder="Ej: gasté 35 mil en mercado"></div>'+
+        '<button type="button" class="mic-btn" id="ai-mic-btn" style="display:flex;">🎤</button>'+
+      '</div>'+
+    '</div>'+
+    '<button class="close-btn" id="ai-send">Enviar</button>'+
+    '<p id="ai-status" style="text-align:center;font-size:13px;color:var(--ink-soft);margin-top:8px;"></p>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('ai-input').focus();
+
+  const micBtn = document.getElementById('ai-mic-btn');
+  if(SpeechRec){
+    micBtn.onclick = ()=>{
+      const rec = new SpeechRec();
+      rec.lang = 'es-CO'; rec.interimResults = false; rec.maxAlternatives = 1;
+      micBtn.classList.add('listening'); micBtn.textContent='●';
+      rec.onresult = (e)=>{
+        const inp = document.getElementById('ai-input');
+        const texto = e.results[0][0].transcript;
+        inp.value = inp.value.trim() ? inp.value.trim()+' '+texto : texto;
+      };
+      rec.onerror = ()=>{};
+      rec.onend = ()=>{ micBtn.classList.remove('listening'); micBtn.textContent='🎤'; };
+      try{ rec.start(); }catch(e){ micBtn.classList.remove('listening'); micBtn.textContent='🎤'; }
+    };
+  } else {
+    micBtn.style.display='none';
+  }
+
+  document.getElementById('ai-send').onclick = async ()=>{
+    const texto = document.getElementById('ai-input').value.trim();
+    if(!texto){ showToast('Escribe o dicta algo primero', 'error'); return; }
+    const statusEl = document.getElementById('ai-status');
+    const sendBtn = document.getElementById('ai-send');
+    sendBtn.disabled = true;
+    statusEl.textContent = 'Pensando...';
+    try{
+      const { data:{ session } } = await sb.auth.getSession();
+      const token = session && session.access_token;
+      const res = await fetch('/api/ai-assist', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre) })
+      });
+      if(res.status===403){ root.innerHTML=''; showPaywallModal(); return; }
+      if(!res.ok){ statusEl.textContent='No se pudo procesar. Intenta de nuevo.'; sendBtn.disabled=false; return; }
+      const data = await res.json();
+      root.innerHTML='';
+      abrirFormularioConIA(data);
+    }catch(e){
+      statusEl.textContent = 'Hubo un error. Intenta de nuevo.';
+      sendBtn.disabled = false;
+    }
+  };
+}
+
+function abrirFormularioConIA(data){
+  const tipo = data.tipo, c = data.campos || {};
+  if(tipo==='gasto'){
+    const cat = state.presupuesto.categorias.find(x=> x.nombre.toLowerCase()===String(c.categoria||'').toLowerCase());
+    openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, fecha:c.fecha });
+  } else if(tipo==='actividad'){
+    const fecha = c.fecha || dateKey(new Date());
+    openActivityModal(fecha, null, null, { nombre:c.nombre, hora:c.hora, notas:c.notas, repite:c.repite });
+  } else if(tipo==='cumpleanos'){
+    openBdayModal(null, { nombre:c.nombre, dia:c.dia, mes:c.mes });
+  } else if(tipo==='pago'){
+    openPagoModal(null, { nombre:c.nombre, dia:c.dia, frecuencia:c.frecuencia });
+  } else if(tipo==='medicamento'){
+    openMedModal(null, { nombre:c.nombre, dosis:c.dosis, horarios:c.horarios });
+  } else {
+    showToast('No logré entender eso, intenta de otra forma', 'error');
+  }
+}
+
 /* ================= NOTIFICACIONES PUSH ================= */
 const VAPID_PUBLIC_KEY = 'BEtoNmVmXXPlz0inHauCKQ8adHhWdvfm8S1c7dvj4t0W12NNcSJwMUMqJgiwSezVlVMc4X7iLCSYhhJSZDbDBP4';
 
@@ -2256,6 +2583,7 @@ function openSettingsModal(){
     '<p style="font-size:12px;color:var(--ink-soft);margin-top:-4px;margin-bottom:12px;">Ciudad actual: <span id="settings-city-current">'+esc((state.settings.weatherLocation&&state.settings.weatherLocation.name)||'Bogotá')+'</span></p>'+
     '<label class="settings-row"><span>🎤 Dictado por voz</span><input type="checkbox" id="settings-mic" '+(state.settings.micEnabled?'checked':'')+'></label>'+
     '<label class="settings-row"><span>🔔 Notificaciones push</span><input type="checkbox" id="settings-push" '+(state.settings.pushEnabled?'checked':'')+'></label>'+
+    '<label class="settings-row"><span>🤖 Asistente de IA (beta)</span><input type="checkbox" id="settings-ai" '+(state.settings.aiEnabled?'checked':'')+'></label>'+
     '<button class="close-btn" id="settings-close">Cerrar</button>';
   bg.appendChild(modal); root.appendChild(bg);
 
@@ -2339,6 +2667,22 @@ function openSettingsModal(){
     }
     saveState();
   };
+  document.getElementById('settings-ai').onchange = async (e)=>{
+    if(e.target.checked){
+      e.target.disabled = true;
+      const allowed = await checkAIAccess();
+      e.target.disabled = false;
+      if(!allowed){
+        e.target.checked = false;
+        showPaywallModal();
+        return;
+      }
+      state.settings.aiEnabled = true;
+    } else {
+      state.settings.aiEnabled = false;
+    }
+    saveState(); applyAIVisibility();
+  };
   document.getElementById('settings-close').onclick = ()=>{ root.innerHTML=''; };
 }
 document.getElementById('btn-settings').onclick = openSettingsModal;
@@ -2416,6 +2760,14 @@ document.getElementById('btn-dark-toggle').onclick = ()=>{
   darkOverride = !currentlyDark;
   applyDarkMode();
 };
+document.getElementById('btn-add-categoria').onclick = ()=> openCategoriaModal(null);
+document.getElementById('btn-add-gasto').onclick = ()=> openGastoModal();
+document.getElementById('btn-toggle-edit-presupuesto').onclick = ()=>{
+  editModePresupuesto = !editModePresupuesto;
+  document.getElementById('btn-toggle-edit-presupuesto').textContent = editModePresupuesto ? '✓ Listo' : '✏️ Editar';
+  document.getElementById('btn-add-categoria').classList.toggle('hidden', !editModePresupuesto);
+  renderPresupuesto();
+};
 document.getElementById('btn-add-med').onclick = ()=> openMedModal(null);
 document.getElementById('sv-save').onclick = ()=>{
   const fecha = document.getElementById('sv-fecha').value || dateKey(new Date());
@@ -2442,6 +2794,7 @@ document.getElementById('sv-save').onclick = ()=>{
 document.getElementById('btn-export-signos').onclick = exportSignosPDF;
 document.getElementById('btn-add-metrica').onclick = openMetricaModal;
 document.getElementById('btn-trends').onclick = openTrendsModal;
+document.getElementById('ai-fab').onclick = openAIModal;
 setInterval(applyDarkMode, 5*60*1000); // revisa cada 5 min para la transición automática si deja la app abierta
 
 /* Acceso: botones de la pantalla de login */
