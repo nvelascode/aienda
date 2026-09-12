@@ -285,10 +285,32 @@
   }
   .rep-btn.selected{ border-color:var(--yolk-dark); background:var(--moss-light); }
 
+  /* ---------- calendario visual (domingo a sábado) ---------- */
+  .cal-modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .cal-nav-btn{
+    border:none; background:var(--moss-light); color:var(--moss);
+    width:34px; height:34px; border-radius:50%; font-size:17px; font-weight:800; cursor:pointer;
+  }
+  .cal-weekdays{ display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:11px; font-weight:800; color:var(--ink-soft); margin-bottom:6px; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .cal-day{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    border-radius:10px; font-size:13px; font-weight:700; color:var(--ink); cursor:pointer;
+    position:relative; background:var(--shell); border:2px solid transparent;
+  }
+  .cal-day.outside{ visibility:hidden; cursor:default; }
+  .cal-day.today{ border-color:var(--yolk-dark); }
+  .cal-day.holiday{ color:var(--brick); background:var(--brick-light); font-weight:800; }
+  .cal-day .cal-dot{
+    width:5px; height:5px; border-radius:50%; background:var(--moss);
+    position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
+  }
+  .cal-day.holiday .cal-dot{ background:var(--brick); }
+
   /* ---------- botón flotante de IA ---------- */
   .ai-fab{
     position:fixed; right:18px; bottom:96px; width:52px; height:52px; border-radius:50%;
-    background:var(--yolk); color:#4A3410; border:none; font-size:22px; cursor:pointer;
+    background:#fff; color:var(--ink); border:2px solid var(--yolk-dark); font-size:22px; cursor:pointer;
     box-shadow:0 6px 16px -4px rgba(0,0,0,.35); z-index:30; display:flex; align-items:center; justify-content:center;
   }
   .ai-fab.hidden{ display:none !important; }
@@ -2708,37 +2730,144 @@ document.getElementById('week-prev').onclick = ()=>{ activitiesWeekStart.setDate
 document.getElementById('week-next').onclick = ()=>{ activitiesWeekStart.setDate(activitiesWeekStart.getDate()+7); renderWeek(); };
 document.getElementById('btn-jump-date').onclick = ()=> openJumpDateModal();
 
+/* ================= FESTIVOS DE COLOMBIA (calculados, no hay que actualizarlos a mano) ================= */
+function calcularPascua(year){
+  // Algoritmo de Gauss/Meeus para el Domingo de Resurrección (calendario gregoriano)
+  const a = year % 19;
+  const b = Math.floor(year/100);
+  const c = year % 100;
+  const d = Math.floor(b/4);
+  const e = b % 4;
+  const f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3);
+  const h = (19*a+b-d-g+15) % 30;
+  const i = Math.floor(c/4);
+  const k = c % 4;
+  const l = (32+2*e+2*i-h-k) % 7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const mes = Math.floor((h+l-7*m+114)/31);
+  const dia = ((h+l-7*m+114) % 31) + 1;
+  return new Date(year, mes-1, dia);
+}
+function siguienteLunes(fecha){
+  const d = new Date(fecha);
+  const day = d.getDay();
+  if(day===1) return d;
+  const add = (8-day) % 7 || 7;
+  d.setDate(d.getDate()+add);
+  return d;
+}
+function sumarDias(fecha, dias){ const d=new Date(fecha); d.setDate(d.getDate()+dias); return d; }
+function festivosColombia(year){
+  const fijos = [
+    {mes:1,dia:1,nombre:'Año Nuevo'},
+    {mes:5,dia:1,nombre:'Día del Trabajo'},
+    {mes:7,dia:20,nombre:'Día de la Independencia'},
+    {mes:8,dia:7,nombre:'Batalla de Boyacá'},
+    {mes:12,dia:8,nombre:'Inmaculada Concepción'},
+    {mes:12,dia:25,nombre:'Navidad'}
+  ];
+  const trasladables = [
+    {mes:1,dia:6,nombre:'Reyes Magos'},
+    {mes:3,dia:19,nombre:'San José'},
+    {mes:6,dia:29,nombre:'San Pedro y San Pablo'},
+    {mes:8,dia:15,nombre:'Asunción de la Virgen'},
+    {mes:10,dia:12,nombre:'Día de la Raza'},
+    {mes:11,dia:1,nombre:'Todos los Santos'},
+    {mes:11,dia:11,nombre:'Independencia de Cartagena'}
+  ];
+  const pascua = calcularPascua(year);
+  const lista = [];
+  fijos.forEach(f=> lista.push({fecha:new Date(year,f.mes-1,f.dia), nombre:f.nombre}));
+  trasladables.forEach(f=> lista.push({fecha:siguienteLunes(new Date(year,f.mes-1,f.dia)), nombre:f.nombre}));
+  lista.push({fecha:sumarDias(pascua,-3), nombre:'Jueves Santo'});
+  lista.push({fecha:sumarDias(pascua,-2), nombre:'Viernes Santo'});
+  lista.push({fecha:siguienteLunes(sumarDias(pascua,39)), nombre:'Ascensión del Señor'});
+  lista.push({fecha:siguienteLunes(sumarDias(pascua,60)), nombre:'Corpus Christi'});
+  lista.push({fecha:siguienteLunes(sumarDias(pascua,68)), nombre:'Sagrado Corazón'});
+  return lista;
+}
+const _festivosCache = {};
+function festivosColombiaMap(year){
+  if(_festivosCache[year]) return _festivosCache[year];
+  const map = {};
+  festivosColombia(year).forEach(f=> map[dateKey(f.fecha)] = f.nombre);
+  _festivosCache[year] = map;
+  return map;
+}
+
+/* ================= CALENDARIO VISUAL (domingo a sábado, festivos y marcas de compromisos) ================= */
+let calViewDate = new Date();
+
 function openJumpDateModal(){
+  calViewDate = new Date(activitiesWeekStart);
+  renderCalendarModal();
+}
+
+function renderCalendarModal(){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
-  const curYear = activitiesWeekStart.getFullYear();
-  const curMonth = activitiesWeekStart.getMonth();
-  const yearsOptions = [];
-  for(let y=curYear-3; y<=curYear+3; y++) yearsOptions.push(y);
-  modal.innerHTML = '<h3>📅 Ir a un mes</h3>'+
-    '<div class="form-card" style="border-style:solid;">'+
-      '<div class="form-two">'+
-        '<div class="frow"><label>Mes</label><select id="jd-mes">'+MONTH_NAMES.map((m,i)=>'<option value="'+i+'"'+(i===curMonth?' selected':'')+'>'+m+'</option>').join('')+'</select></div>'+
-        '<div class="frow"><label>Año</label><select id="jd-anio">'+yearsOptions.map(y=>'<option value="'+y+'"'+(y===curYear?' selected':'')+'>'+y+'</option>').join('')+'</select></div>'+
-      '</div>'+
-      '<button class="pill-btn yolk" id="jd-hoy" style="width:100%;margin-top:4px;">Ir a hoy</button>'+
+
+  const year = calViewDate.getFullYear();
+  const month = calViewDate.getMonth();
+  const startOffset = new Date(year, month, 1).getDay(); // 0 = domingo
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const festivos = festivosColombiaMap(year);
+  const hoy = new Date();
+  const weekdayLabels = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+  let cellsHtml = '';
+  for(let i=0;i<startOffset;i++){ cellsHtml += '<div class="cal-day outside"></div>'; }
+  for(let dia=1; dia<=daysInMonth; dia++){
+    const d = new Date(year, month, dia);
+    const key = dateKey(d);
+    const isToday = sameDate(d, hoy);
+    const holidayName = festivos[key];
+    const hasItems = buildDayItems(d).length>0;
+    let cls = 'cal-day';
+    if(isToday) cls += ' today';
+    if(holidayName) cls += ' holiday';
+    cellsHtml += '<div class="'+cls+'" data-date="'+key+'" data-holiday="'+(holidayName?esc(holidayName):'')+'">'+dia+
+      (hasItems?'<span class="cal-dot"></span>':'')+
+      '</div>';
+  }
+
+  modal.innerHTML = '<div class="cal-modal-head">'+
+      '<button class="cal-nav-btn" id="cal-prev">‹</button>'+
+      '<h3 style="margin:0;">'+MONTH_NAMES[month]+' '+year+'</h3>'+
+      '<button class="cal-nav-btn" id="cal-next">›</button>'+
     '</div>'+
-    '<button class="close-btn" id="jd-ir">Ir a ese mes</button>';
+    '<div class="cal-weekdays">'+weekdayLabels.map(w=>'<div>'+w+'</div>').join('')+'</div>'+
+    '<div class="cal-grid">'+cellsHtml+'</div>'+
+    '<div style="display:flex;gap:14px;margin-top:12px;font-size:12px;color:var(--ink-soft);">'+
+      '<span><span class="cal-dot" style="position:static;display:inline-block;margin-right:4px;"></span>Hay algo agendado</span>'+
+      '<span style="color:var(--brick);font-weight:800;">■ Festivo</span>'+
+    '</div>'+
+    '<button class="pill-btn yolk" id="cal-hoy" style="width:100%;margin-top:14px;">Ir a hoy</button>'+
+    '<button class="close-btn" id="cal-cerrar">Cerrar</button>';
   bg.appendChild(modal); root.appendChild(bg);
 
-  document.getElementById('jd-ir').onclick = ()=>{
-    const mes = parseInt(document.getElementById('jd-mes').value,10);
-    const anio = parseInt(document.getElementById('jd-anio').value,10);
-    activitiesWeekStart = getMonday(new Date(anio, mes, 1));
-    root.innerHTML=''; renderWeek();
-  };
-  document.getElementById('jd-hoy').onclick = ()=>{
+  document.getElementById('cal-prev').onclick = ()=>{ calViewDate.setMonth(calViewDate.getMonth()-1); renderCalendarModal(); };
+  document.getElementById('cal-next').onclick = ()=>{ calViewDate.setMonth(calViewDate.getMonth()+1); renderCalendarModal(); };
+  document.getElementById('cal-hoy').onclick = ()=>{
     activitiesWeekStart = getMonday(new Date());
     root.innerHTML=''; renderWeek();
   };
+  document.getElementById('cal-cerrar').onclick = ()=>{ root.innerHTML=''; };
+
+  modal.querySelectorAll('.cal-day[data-date]').forEach(el=>{
+    el.onclick = ()=>{
+      const key = el.dataset.date;
+      const d = new Date(key+'T00:00:00');
+      const holiday = el.dataset.holiday;
+      if(holiday) showToast('Festivo: '+holiday, 'ok');
+      activitiesWeekStart = getMonday(d);
+      root.innerHTML=''; renderWeek();
+    };
+  });
 }
 
 document.getElementById('btn-add-bday').onclick = ()=> openBdayModal(null);
