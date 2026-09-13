@@ -1,8 +1,21 @@
 // api/ai-assist.js
+// La lista de correos permitidos vive en la tabla ai_allowed_users de Supabase
+// (misma tabla que consulta ai-check.js) — se administra desde ahí, no aquí.
+
 const SUPABASE_URL = 'https://hymclqcdpplamdinfrhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_-PXExRRGp6CTYxgGd5ftBA_aIHY_04D';
 
-const ALLOWED_EMAILS = ['nvelascop@ismm.edu.co', 'silvitapinzon2015@gmail.com', 'judys_90@hotmail.com'];
+async function tieneAcceso(email) {
+  const SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+  if (!SECRET_KEY) return false;
+  const checkRes = await fetch(
+    SUPABASE_URL + '/rest/v1/ai_allowed_users?email=eq.' + encodeURIComponent(email) + '&select=email',
+    { headers: { apikey: SECRET_KEY, Authorization: 'Bearer ' + SECRET_KEY } }
+  );
+  if (!checkRes.ok) return false;
+  const rows = await checkRes.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -28,7 +41,7 @@ module.exports = async (req, res) => {
     const user = await userRes.json();
     const email = (user.email || '').toLowerCase();
 
-    if (!ALLOWED_EMAILS.includes(email)) {
+    if (!(await tieneAcceso(email))) {
       res.status(403).json({ error: 'no_access' });
       return;
     }
@@ -44,7 +57,9 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Fecha de referencia en hora de Bogotá (no UTC), para que "hoy" coincida
+    // con lo que la app muestra en el teléfono, sobre todo en horas de la noche.
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
     const listaCategorias = Array.isArray(categorias) ? categorias.join(', ') : '';
     const contextoJson = contexto ? JSON.stringify(contexto) : '{}';
 
