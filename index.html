@@ -96,6 +96,23 @@
     border:none;background:var(--shell);border:1px solid var(--line);
     width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer;transition:background .2s;
   }
+  #search-bar{
+    padding:0 16px 14px;
+  }
+  #search-bar input{
+    width:100%;border:1.5px solid var(--line);border-radius:14px;
+    padding:11px 14px;font-size:14px;font-family:inherit;font-weight:700;color:var(--ink);
+    background:var(--input-bg);
+  }
+  #search-bar input:focus{outline:none;border-color:var(--yolk-dark);}
+  #search-results{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+  .search-result{
+    background:var(--shell);border:1px solid var(--line);border-radius:14px;
+    padding:11px 13px;cursor:pointer;
+  }
+  .search-result .sr-tipo{font-size:11px;font-weight:800;color:var(--sky);text-transform:uppercase;letter-spacing:.3px;}
+  .search-result .sr-texto{font-size:14px;font-weight:700;margin-top:2px;}
+  .search-result .sr-meta{font-size:12px;color:var(--ink-soft);margin-top:1px;}
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;color-scheme:light;}
   body{
@@ -394,6 +411,11 @@
   .mkt-row .item-text{font-size:14.5px;}
   .mkt-row.done{opacity:.6;}
   .mkt-row.done .item-text{text-decoration:line-through;text-decoration-color:var(--moss);}
+  .mkt-cat-title{
+    font-size:12px;font-weight:800;color:var(--sky);text-transform:uppercase;letter-spacing:.3px;
+    margin:12px 0 6px;
+  }
+  .mkt-cat-title:first-child{margin-top:0;}
 
   /* ---------- carrusel horizontal (próxima semana) ---------- */
   .hscroll{
@@ -526,8 +548,13 @@
     </div>
     <div class="topbar-actions">
       <button class="gear-btn" id="btn-settings" title="Configuración">⚙️</button>
-      <button class="dark-toggle-btn" id="btn-dark-toggle" title="Modo oscuro">🌙</button>
+      <button class="dark-toggle-btn" id="btn-search-toggle" title="Buscar">🔍</button>
     </div>
+  </div>
+
+  <div id="search-bar" class="hidden">
+    <input id="search-input" placeholder="Buscar actividades, gastos, cumpleaños..." autocomplete="off">
+    <div id="search-results"></div>
   </div>
 
   <!-- HOME -->
@@ -591,7 +618,8 @@
     </div>
     <div class="day-card">
       <div id="default-list"></div>
-      <div class="add-row hidden" id="mkt-add-row" style="margin-top:8px;">
+      <div class="add-row hidden" id="mkt-add-row" style="margin-top:8px;flex-wrap:wrap;">
+        <select id="mkt-cat-select" class="settings-input" style="flex:1 1 100%;margin-bottom:6px;"></select>
         <input id="mkt-input" placeholder="Añadir producto a la lista...">
         <span id="mkt-mic-holder"></span>
         <button class="add-btn" id="mkt-add-btn">+</button>
@@ -734,6 +762,23 @@ const TAB_DEFS = [
   {key:'signos',       label:'Signos vitales',icon:'🩺'},
 ];
 
+// Orden pensado como un recorrido típico de supermercado, de la entrada a la caja.
+const MERCADO_CATEGORIAS = ['Frutas y verduras','Carnes y embutidos','Lácteos','Panadería y granos','Bebidas','Congelados','Aseo del hogar','Aseo personal','Otros'];
+function categoriaDe(item){
+  return (item.categoria && MERCADO_CATEGORIAS.includes(item.categoria)) ? item.categoria : 'Otros';
+}
+function agruparPorCategoria(items){
+  const grupos = {};
+  items.forEach(m=>{
+    const cat = categoriaDe(m);
+    if(!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(m);
+  });
+  return MERCADO_CATEGORIAS
+    .filter(cat=> grupos[cat] && grupos[cat].length)
+    .map(cat=> ({ categoria:cat, items: grupos[cat].sort((a,b)=> a.nombre.localeCompare(b.nombre,'es')) }));
+}
+
 // Estado "de fábrica" para una cuenta nueva. Cada usuario arranca en blanco;
 // nada de lo que ve un usuario viene precargado con datos de otro.
 function blankState(){
@@ -783,8 +828,8 @@ function isNightTime(){
 function applyDarkMode(){
   const dark = darkOverride!==null ? darkOverride : isNightTime();
   document.body.classList.toggle('dark-mode', dark);
-  const btn = document.getElementById('btn-dark-toggle');
-  if(btn) btn.textContent = dark ? '☀️' : '🌙';
+  const settingsChk = document.getElementById('settings-darkmode');
+  if(settingsChk) settingsChk.checked = dark;
 }
 let saveTimer = null;
 
@@ -1936,20 +1981,26 @@ function renderMercadoCart(){
     holder.innerHTML='<div class="empty-note">Tu carrito está vacío</div>';
     return;
   }
-  enCarrito.forEach(m=>{
-    if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
-    const row=document.createElement('div');
-    row.className='mkt-row'+(m.comprado?' done':'');
-    row.style.cursor='pointer';
-    const chk=document.createElement('div');
-    chk.className='chk'+(m.comprado?' on':'');
-    chk.textContent=m.comprado?'✓':'';
-    row.appendChild(chk);
-    const txt=document.createElement('div');
-    txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
-    row.appendChild(txt);
-    row.onclick=()=>{ m.comprado=!m.comprado; saveState(); renderAll(); };
-    holder.appendChild(row);
+  agruparPorCategoria(enCarrito).forEach(grupo=>{
+    const catTitle=document.createElement('div');
+    catTitle.className='mkt-cat-title';
+    catTitle.textContent=grupo.categoria;
+    holder.appendChild(catTitle);
+    grupo.items.forEach(m=>{
+      if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
+      const row=document.createElement('div');
+      row.className='mkt-row'+(m.comprado?' done':'');
+      row.style.cursor='pointer';
+      const chk=document.createElement('div');
+      chk.className='chk'+(m.comprado?' on':'');
+      chk.textContent=m.comprado?'✓':'';
+      row.appendChild(chk);
+      const txt=document.createElement('div');
+      txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
+      row.appendChild(txt);
+      row.onclick=()=>{ m.comprado=!m.comprado; saveState(); renderAll(); };
+      holder.appendChild(row);
+    });
   });
 }
 
@@ -1961,35 +2012,117 @@ function renderMercadoDefault(){
     holder.innerHTML='<div class="empty-note">Aún no hay productos en la lista predeterminada.</div>';
     return;
   }
-  const listaOrdenada = [...state.mercadoDefault].sort((a,b)=> a.nombre.localeCompare(b.nombre, 'es'));
-  listaOrdenada.forEach(m=>{
-    if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
-    const row=document.createElement('div');
-    row.className='mkt-row';
-    const chk=document.createElement('div');
-    chk.className='chk'+(m.enCarrito?' on':'');
-    chk.textContent=m.enCarrito?'✓':'';
-    chk.onclick=()=>{
-      m.enCarrito=!m.enCarrito;
-      if(!m.enCarrito){ m.comprado=false; } // al sacarlo del carrito se olvida si estaba tachado
-      else { showToast('Agregado', 'ok'); }
-      saveState(); renderAll();
-    };
-    row.appendChild(chk);
-    const txt=document.createElement('div');
-    txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
-    row.appendChild(txt);
-    if(editModeMercado){
-      const del=document.createElement('button');
-      del.className='del-x'; del.textContent='✕';
-      del.onclick=()=> scheduleDelete(m.id, m.nombre, ()=>{
-        state.mercadoDefault=state.mercadoDefault.filter(x=>x.id!==m.id);
-        saveState();
-      });
-      row.appendChild(del);
-    }
-    holder.appendChild(row);
+  agruparPorCategoria(state.mercadoDefault).forEach(grupo=>{
+    const catTitle=document.createElement('div');
+    catTitle.className='mkt-cat-title';
+    catTitle.textContent=grupo.categoria;
+    holder.appendChild(catTitle);
+    grupo.items.forEach(m=>{
+      if(pendingDeletes[m.id]){ holder.appendChild(pendingDeleteRow(m.id, m.nombre)); return; }
+      const row=document.createElement('div');
+      row.className='mkt-row';
+      const chk=document.createElement('div');
+      chk.className='chk'+(m.enCarrito?' on':'');
+      chk.textContent=m.enCarrito?'✓':'';
+      chk.onclick=()=>{
+        m.enCarrito=!m.enCarrito;
+        if(!m.enCarrito){ m.comprado=false; } // al sacarlo del carrito se olvida si estaba tachado
+        else { showToast('Agregado', 'ok'); }
+        saveState(); renderAll();
+      };
+      row.appendChild(chk);
+      const txt=document.createElement('div');
+      txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
+      row.appendChild(txt);
+      if(editModeMercado){
+        const catSel=document.createElement('select');
+        catSel.className='settings-input';
+        catSel.style.cssText='width:auto;padding:4px 8px;font-size:12px;margin-right:4px;';
+        catSel.innerHTML = MERCADO_CATEGORIAS.map(c=>'<option value="'+c+'"'+(categoriaDe(m)===c?' selected':'')+'>'+c+'</option>').join('');
+        catSel.onchange=()=>{ m.categoria=catSel.value; saveState(); renderMercadoDefault(); renderMercadoCart(); };
+        row.appendChild(catSel);
+        const del=document.createElement('button');
+        del.className='del-x'; del.textContent='✕';
+        del.onclick=()=> scheduleDelete(m.id, m.nombre, ()=>{
+          state.mercadoDefault=state.mercadoDefault.filter(x=>x.id!==m.id);
+          saveState();
+        });
+        row.appendChild(del);
+      }
+      holder.appendChild(row);
+    });
   });
+}
+
+/* ================= BUSCADOR ================= */
+function normalizarBusqueda(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function buscarEnApp(queryOriginal){
+  const q = normalizarBusqueda(queryOriginal);
+  if(!q) return [];
+  const resultados = [];
+
+  Object.keys(state.templates).forEach(dn=>{
+    state.templates[dn].forEach(t=>{
+      if(normalizarBusqueda(t.texto+' '+(t.notas||'')).includes(q)){
+        resultados.push({ tipo:'Actividad', texto:t.texto, meta:'Cada '+dn+(t.hora?' · '+t.hora:''), accion:()=> switchTab('actividades') });
+      }
+    });
+  });
+  state.compromisos.forEach(c=>{
+    if(normalizarBusqueda(c.nombre+' '+(c.notas||'')).includes(q)){
+      const d = new Date(c.date+'T00:00:00');
+      resultados.push({ tipo:'Actividad', texto:c.nombre, meta:d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+(c.hora?' · '+c.hora:''),
+        accion:()=>{ activitiesWeekStart = getMonday(d); switchTab('actividades'); renderWeek(); } });
+    }
+  });
+  state.presupuesto.gastos.forEach(g=>{
+    if(normalizarBusqueda(g.nombre).includes(q)){
+      const d = new Date(g.fecha+'T00:00:00');
+      resultados.push({ tipo:'Gasto', texto:g.nombre, meta:formatMoney(g.monto)+' · '+d.getDate()+' de '+MONTH_NAMES[d.getMonth()],
+        accion:()=> switchTab('presupuesto') });
+    }
+  });
+  state.cumpleanos.forEach(c=>{
+    if(normalizarBusqueda(c.nombre+' '+(c.notas||'')).includes(q)){
+      resultados.push({ tipo:'Cumpleaños', texto:c.nombre, meta:c.dia+' de '+MONTH_NAMES[c.mes-1],
+        accion:()=> switchTab('cumple') });
+    }
+  });
+
+  return resultados.slice(0, 30);
+}
+function renderSearchResults(query){
+  const holder = document.getElementById('search-results');
+  if(!query.trim()){ holder.innerHTML=''; return; }
+  const resultados = buscarEnApp(query);
+  if(resultados.length===0){
+    holder.innerHTML = '<div class="empty-note">Sin resultados para "'+esc(query)+'"</div>';
+    return;
+  }
+  holder.innerHTML = '';
+  resultados.forEach(r=>{
+    const div = document.createElement('div');
+    div.className = 'search-result';
+    div.innerHTML = '<div class="sr-tipo">'+esc(r.tipo)+'</div><div class="sr-texto">'+esc(r.texto)+'</div><div class="sr-meta">'+esc(r.meta)+'</div>';
+    div.onclick = ()=>{
+      r.accion();
+      cerrarBusqueda();
+    };
+    holder.appendChild(div);
+  });
+}
+function abrirBusqueda(){
+  document.getElementById('search-bar').classList.remove('hidden');
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-input').focus();
+}
+function cerrarBusqueda(){
+  document.getElementById('search-bar').classList.add('hidden');
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').innerHTML = '';
 }
 
 /* ================= MASTER RENDER ================= */
@@ -2817,6 +2950,7 @@ function openSettingsModal(){
     '</div>'+
     '<p style="font-size:12px;color:var(--ink-soft);margin-top:-4px;margin-bottom:12px;">Ciudad actual: <span id="settings-city-current">'+esc((state.settings.weatherLocation&&state.settings.weatherLocation.name)||'Bogotá')+'</span></p>'+
     '<label class="settings-row"><span>🎤 Dictado por voz</span><input type="checkbox" id="settings-mic" '+(state.settings.micEnabled?'checked':'')+'></label>'+
+    '<label class="settings-row"><span>🌙 Modo oscuro</span><input type="checkbox" id="settings-darkmode" '+(document.body.classList.contains('dark-mode')?'checked':'')+'></label>'+
     '<label class="settings-row"><span>🔔 Notificaciones push</span><input type="checkbox" id="settings-push" '+(state.settings.pushEnabled?'checked':'')+'></label>'+
     '<label class="settings-row"><span>🤖 Asistente de IA (beta)</span><input type="checkbox" id="settings-ai" '+(state.settings.aiEnabled?'checked':'')+'></label>'+
     '<button class="close-btn" id="settings-close">Cerrar</button>';
@@ -2893,6 +3027,10 @@ function openSettingsModal(){
   document.getElementById('settings-mic').onchange = (e)=>{
     state.settings.micEnabled = e.target.checked;
     saveState(); applyMicVisibility();
+  };
+  document.getElementById('settings-darkmode').onchange = (e)=>{
+    darkOverride = e.target.checked;
+    applyDarkMode();
   };
   document.getElementById('settings-push').onchange = async (e)=>{
     if(e.target.checked){
@@ -3085,11 +3223,13 @@ document.getElementById('btn-toggle-edit-mercado').onclick = ()=>{
   renderMercadoDefault();
 };
 
+document.getElementById('mkt-cat-select').innerHTML = MERCADO_CATEGORIAS.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
 document.getElementById('mkt-add-btn').onclick = ()=>{
   const inp = document.getElementById('mkt-input');
   const val = inp.value.trim();
   if(!val) return;
-  state.mercadoDefault.push({id:uid(), nombre:val, enCarrito:false, comprado:false});
+  const categoria = document.getElementById('mkt-cat-select').value;
+  state.mercadoDefault.push({id:uid(), nombre:val, categoria, enCarrito:false, comprado:false});
   inp.value='';
   saveState(); renderAll();
 };
@@ -3101,11 +3241,13 @@ document.getElementById('mkt-clear-btn').onclick = ()=>{
 };
 
 /* ================= INIT ================= */
-document.getElementById('btn-dark-toggle').onclick = ()=>{
-  const currentlyDark = document.body.classList.contains('dark-mode');
-  darkOverride = !currentlyDark;
-  applyDarkMode();
+document.getElementById('btn-search-toggle').onclick = ()=>{
+  const bar = document.getElementById('search-bar');
+  if(bar.classList.contains('hidden')) abrirBusqueda();
+  else cerrarBusqueda();
 };
+document.getElementById('search-input').addEventListener('input', e=> renderSearchResults(e.target.value));
+document.getElementById('search-input').addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarBusqueda(); });
 document.getElementById('btn-add-categoria').onclick = ()=> openCategoriaModal(null);
 document.getElementById('btn-add-gasto').onclick = ()=> openGastoModal();
 document.getElementById('btn-toggle-edit-presupuesto').onclick = ()=>{
