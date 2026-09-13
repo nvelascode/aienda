@@ -2554,6 +2554,19 @@ function construirContextoIA(){
       actividades: items.map(it=>({ nombre:it.texto, hora:it.hora||null, notas:it.notas||'' }))
     });
   }
+  const signosRecientes = [...state.signosVitales]
+    .sort((a,b)=> (b.fecha+b.hora).localeCompare(a.fecha+a.hora))
+    .slice(0, 10)
+    .map(r=>({
+      fecha:r.fecha, hora:r.hora,
+      sistolica:r.sistolica||null, diastolica:r.diastolica||null,
+      fc:r.fc||null, glicemia:r.glicemia||null, peso:r.peso||null,
+      otros: Object.keys(r.otros||{}).reduce((acc,mid)=>{
+        const def = state.signosMetricas.find(m=>m.id===mid);
+        if(def) acc[def.nombre] = r.otros[mid];
+        return acc;
+      }, {})
+    }));
   return {
     actividadesProximosDias: dias,
     cumpleanos: state.cumpleanos.map(c=>({ nombre:c.nombre, dia:c.dia, mes:c.mes })),
@@ -2562,7 +2575,13 @@ function construirContextoIA(){
       return { nombre:p.nombre, diaDelMes:p.dia, frecuencia:p.frecuencia||'mensual', pagado:info.paid, diasParaVencer:info.diffDays };
     }),
     presupuesto: state.presupuesto.categorias.map(c=>({ nombre:c.nombre, presupuestoMensual:c.monto, gastadoEsteMes:totalGastadoCategoria(c.id) })),
-    medicamentos: state.medicamentos.map(m=>({ nombre:m.nombre, dosis:m.dosis, horarios:m.horarios }))
+    medicamentos: state.medicamentos.map(m=>({ nombre:m.nombre, dosis:m.dosis, horarios:m.horarios })),
+    mercado: {
+      enCarritoPendiente: state.mercadoDefault.filter(m=>m.enCarrito && !m.comprado).map(m=>m.nombre),
+      enCarritoYaComprado: state.mercadoDefault.filter(m=>m.enCarrito && m.comprado).map(m=>m.nombre),
+      listaPredeterminadaCompleta: state.mercadoDefault.map(m=>m.nombre)
+    },
+    signosVitalesRecientes: signosRecientes
   };
 }
 
