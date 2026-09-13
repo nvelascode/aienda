@@ -1,15 +1,7 @@
 // api/ai-assist.js
-// Esta función corre en el servidor de Vercel, NUNCA en el navegador de quien usa la app.
-// Por eso la clave de OpenAI (OPENAI_API_KEY) puede vivir aquí de forma segura, sin que
-// nadie pueda verla o robársela desde las herramientas de desarrollador.
-
 const SUPABASE_URL = 'https://hymclqcdpplamdinfrhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_-PXExRRGp6CTYxgGd5ftBA_aIHY_04D';
 
-// AJUSTA ESTA LISTA para decidir quién puede usar la IA en Aienda.
-// Por ahora: solo tu cuenta. Cuando quieras vender el plan pago, aquí es donde
-// agregarías a cada persona que ya pagó (o mejor, se reemplaza por una consulta
-// a una tabla de Supabase — pero para una sola persona, esto es más que suficiente).
 const ALLOWED_EMAILS = ['nvelascop@ismm.edu.co', 'silvitapinzon2015@gmail.com'];
 
 module.exports = async (req, res) => {
@@ -21,21 +13,29 @@ module.exports = async (req, res) => {
   try {
     const { text, categorias, contexto, token } = req.body || {};
 
+    console.log('[ai-assist] token recibido, longitud:', token ? token.length : 'NINGUNO');
+
     if (!token) {
       res.status(401).json({ error: 'no_auth' });
       return;
     }
 
-    // Verificamos con Supabase que el token de sesión es real y obtenemos el correo.
     const userRes = await fetch(SUPABASE_URL + '/auth/v1/user', {
       headers: { Authorization: 'Bearer ' + token, apikey: SUPABASE_ANON_KEY }
     });
+
+    console.log('[ai-assist] userRes.status:', userRes.status);
+    const userResBodyText = await userRes.clone().text();
+    console.log('[ai-assist] userRes body:', userResBodyText);
+
     if (!userRes.ok) {
       res.status(401).json({ error: 'no_auth' });
       return;
     }
+
     const user = await userRes.json();
     const email = (user.email || '').toLowerCase();
+    console.log('[ai-assist] email verificado:', email);
 
     if (!ALLOWED_EMAILS.includes(email)) {
       res.status(403).json({ error: 'no_access' });
@@ -101,6 +101,7 @@ module.exports = async (req, res) => {
 
     res.status(200).json(parsed);
   } catch (err) {
+    console.error('[ai-assist] excepción:', err);
     res.status(500).json({ error: 'server_error' });
   }
 };
