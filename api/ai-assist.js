@@ -2572,7 +2572,17 @@ function hablar(texto){
     speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(texto);
     const voces = speechSynthesis.getVoices();
-    const vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
+    // Preferimos voces de español latinoamericano, en este orden. Si el teléfono
+    // no tiene ninguna de estas instaladas, caemos a cualquier "es-" que no sea
+    // de España, y solo como último recurso a cualquier voz en español.
+    const prioridad = ['es-419','es-us','es-mx','es-co','es-ar','es-cl','es-pe','es-ve','es-ec','es-do'];
+    let vozEs = null;
+    for(const pref of prioridad){
+      vozEs = voces.find(v=> v.lang && v.lang.toLowerCase()===pref);
+      if(vozEs) break;
+    }
+    if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es') && v.lang.toLowerCase()!=='es-es');
+    if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
     if(vozEs) utter.voice = vozEs;
     utter.lang = vozEs ? vozEs.lang : 'es-ES';
     utter.onerror = (e)=>{ console.error('Error de síntesis de voz', e); };
