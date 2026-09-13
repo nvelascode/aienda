@@ -2477,9 +2477,14 @@ function openAIModal(){
   recActual.maxAlternatives = 1;
   estadoEl.innerHTML = '🎙️<br>Escuchando… di lo que necesitas';
   recActual.onresult = (e)=>{
-    const texto = e.results[0][0].transcript;
-    estadoEl.innerHTML = '"'+esc(texto)+'"<br><span style="font-size:13px;">Pensando…</span>';
-    procesarTextoIA(texto, root, estadoEl);
+    try{
+      const texto = e.results[0][0].transcript;
+      estadoEl.innerHTML = '"'+esc(texto)+'"<br><span style="font-size:13px;">Pensando…</span>';
+      procesarTextoIA(texto, root, estadoEl);
+    }catch(err){
+      showToast('Ocurrió un error al procesar lo que dijiste.', 'error');
+      console.error('Error en onresult del reconocimiento de voz', err);
+    }
   };
   recActual.onerror = (e)=>{
     if(e.error==='no-speech'){ estadoEl.textContent = 'No escuché nada. Toca el fondo para cerrar, o escribe.'; }
@@ -2537,7 +2542,20 @@ async function procesarTextoIA(texto, root, estadoEl){
 
 function construirContextoIA(){
   const hoy = new Date();
+  const dias = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(hoy);
+    d.setDate(hoy.getDate()+i);
+    const items = buildDayItems(d);
+    dias.push({
+      fecha: dateKey(d),
+      diaSemana: DAY_NAMES[(d.getDay()+6)%7],
+      esHoy: i===0,
+      actividades: items.map(it=>({ nombre:it.texto, hora:it.hora||null, notas:it.notas||'' }))
+    });
+  }
   return {
+    actividadesProximosDias: dias,
     cumpleanos: state.cumpleanos.map(c=>({ nombre:c.nombre, dia:c.dia, mes:c.mes })),
     pagos: state.pagos.map(p=>{
       const info = pagoInfo(p, hoy);
@@ -2548,16 +2566,30 @@ function construirContextoIA(){
   };
 }
 
-function hablar(texto, onEnd){
-  if(!('speechSynthesis' in window)){ if(onEnd) onEnd(); return; }
-  speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(texto);
-  const voces = speechSynthesis.getVoices();
-  const vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
-  if(vozEs) utter.voice = vozEs;
-  utter.lang = vozEs ? vozEs.lang : 'es-ES';
-  if(onEnd){ utter.onend = onEnd; utter.onerror = onEnd; }
-  speechSynthesis.speak(utter);
+function hablar(texto){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(texto);
+    const voces = speechSynthesis.getVoices();
+    // Preferimos voces de español latinoamericano, en este orden. Si el teléfono
+    // no tiene ninguna de estas instaladas, caemos a cualquier "es-" que no sea
+    // de España, y solo como último recurso a cualquier voz en español.
+    const prioridad = ['es-419','es-us','es-mx','es-co','es-ar','es-cl','es-pe','es-ve','es-ec','es-do'];
+    let vozEs = null;
+    for(const pref of prioridad){
+      vozEs = voces.find(v=> v.lang && v.lang.toLowerCase()===pref);
+      if(vozEs) break;
+    }
+    if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es') && v.lang.toLowerCase()!=='es-es');
+    if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
+    if(vozEs) utter.voice = vozEs;
+    utter.lang = vozEs ? vozEs.lang : 'es-ES';
+    utter.onerror = (e)=>{ console.error('Error de síntesis de voz', e); };
+    speechSynthesis.speak(utter);
+  }catch(err){
+    console.error('No se pudo hablar', err);
+  }
 }
 
 function prepararVocesTTS(){
@@ -2578,7 +2610,7 @@ function mostrarRespuestaIA(texto){
   bg.appendChild(modal); root.appendChild(bg);
   document.getElementById('resp-cerrar').onclick = ()=>{ speechSynthesis.cancel(); root.innerHTML=''; };
   if(iaUsandoVoz){
-    hablar(texto, ()=>{ if(document.getElementById('resp-cerrar')) root.innerHTML=''; });
+    hablar(texto);
   }
 }
 
@@ -2613,17 +2645,21 @@ function abrirFormularioConIA(data){
   } else if(tipo==='categoria'){
     openCategoriaModal(null, { nombre:c.nombre, monto:c.monto });
   } else if(tipo==='mercado'){
-    const nombreProducto = (c.nombre||'').trim();
-    if(!nombreProducto){ showToast('No logré entender qué producto era', 'error'); return; }
-    let prod = state.mercadoDefault.find(m=> m.nombre.toLowerCase()===nombreProducto.toLowerCase());
-    if(!prod){
-      prod = { id:uid(), nombre:nombreProducto, enCarrito:true, comprado:false };
-      state.mercadoDefault.push(prod);
-    } else {
-      prod.enCarrito = true;
-    }
+    // Soporta uno o varios productos: c.productos (arreglo) o, por compatibilidad, c.nombre (uno solo)
+    let productos = Array.isArray(c.productos) ? c.productos : (c.nombre ? [c.nombre] : []);
+    productos = productos.map(p=> String(p||'').trim()).filter(Boolean);
+    if(productos.length===0){ showToast('No logré entender qué producto era', 'error'); return; }
+    productos.forEach(nombreProducto=>{
+      let prod = state.mercadoDefault.find(m=> m.nombre.toLowerCase()===nombreProducto.toLowerCase());
+      if(!prod){
+        prod = { id:uid(), nombre:nombreProducto, enCarrito:true, comprado:false };
+        state.mercadoDefault.push(prod);
+      } else {
+        prod.enCarrito = true;
+      }
+    });
     saveState(); renderAll();
-    showToast(nombreProducto+' agregado al carrito', 'ok');
+    showToast((productos.length>1 ? productos.join(', ')+' agregados al carrito' : productos[0]+' agregado al carrito'), 'ok');
   } else {
     showToast('No logré entender eso, intenta de otra forma', 'error');
   }
