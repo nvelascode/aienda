@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://hymclqcdpplamdinfrhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_-PXExRRGp6CTYxgGd5ftBA_aIHY_04D';
 
-const ALLOWED_EMAILS = ['nvelascop@ismm.edu.co', 'silvitapinzon2015@gmail.com'];
+const ALLOWED_EMAILS = ['nvelascop@ismm.edu.co', 'silvitapinzon2015@gmail.com', 'judys_90@hotmail.com'];
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
