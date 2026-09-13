@@ -13,8 +13,6 @@ module.exports = async (req, res) => {
   try {
     const { text, categorias, contexto, token } = req.body || {};
 
-    console.log('[ai-assist] token recibido, longitud:', token ? token.length : 'NINGUNO');
-
     if (!token) {
       res.status(401).json({ error: 'no_auth' });
       return;
@@ -23,19 +21,12 @@ module.exports = async (req, res) => {
     const userRes = await fetch(SUPABASE_URL + '/auth/v1/user', {
       headers: { Authorization: 'Bearer ' + token, apikey: SUPABASE_ANON_KEY }
     });
-
-    console.log('[ai-assist] userRes.status:', userRes.status);
-    const userResBodyText = await userRes.clone().text();
-    console.log('[ai-assist] userRes body:', userResBodyText);
-
     if (!userRes.ok) {
       res.status(401).json({ error: 'no_auth' });
       return;
     }
-
     const user = await userRes.json();
     const email = (user.email || '').toLowerCase();
-    console.log('[ai-assist] email verificado:', email);
 
     if (!ALLOWED_EMAILS.includes(email)) {
       res.status(403).json({ error: 'no_access' });
@@ -60,7 +51,7 @@ module.exports = async (req, res) => {
     const systemPrompt =
       'Eres un asistente que convierte frases en español en un objeto JSON para una app de organización personal. ' +
       'Hoy es ' + hoy + ' (formato YYYY-MM-DD). Categorías de gasto ya existentes en la app: [' + listaCategorias + ']. ' +
-      'Estos son los datos actuales guardados por esta persona (úsalos SOLO para responder preguntas, tipo "consulta"): ' + contextoJson + '. ' +
+      'Estos son los datos actuales guardados por esta persona (úsalos SOLO para responder preguntas, tipo "consulta"), incluyendo sus actividades programadas día por día en "actividadesProximosDias" (arreglo de los próximos 7 días; el elemento con esHoy:true es hoy; cada día trae su lista "actividades"): ' + contextoJson + '. ' +
       'Responde SOLO con JSON válido, sin explicación ni texto adicional, con esta forma exacta: ' +
       '{"tipo":"gasto|actividad|cumpleanos|pago|medicamento|categoria|mercado|consulta|signos|desconocido","campos":{}}. ' +
       'Según el tipo, "campos" debe tener EXACTAMENTE estas llaves: ' +
@@ -70,8 +61,8 @@ module.exports = async (req, res) => {
       'pago: nombre (string), dia (number 1-31), frecuencia ("mensual" o "bimestral"). ' +
       'medicamento: nombre (string), dosis (string, puede ser ""), horarios (arreglo de strings HH:MM en 24 horas). ' +
       'categoria: usa este tipo SOLO si la persona pide explícitamente crear/agregar una categoría de presupuesto (ej: "crea la categoría transporte", "agrega una categoría de mascotas con 100 mil"). campos: nombre (string), monto (number, 0 si no menciona un monto). ' +
-      'mercado: usa este tipo cuando la persona pide agregar algo a la lista o al carrito de mercado/compras (ej: "agrega atún al mercado", "pon leche en el carrito", "necesito comprar papel higiénico"). campos: nombre (string, el producto). ' +
-      'consulta: usa este tipo cuando la persona hace una PREGUNTA sobre algo que ya tiene guardado (ej: "¿cuándo es el cumpleaños de Juan?", "¿cuánto llevo gastado en mercado?", "¿qué pagos me faltan?", "¿a qué hora me toca el losartán?"). Responde usando ÚNICAMENTE los datos del contexto de arriba — si no tienes esa información en el contexto, dilo claramente en vez de inventar. campos: {"respuesta": string} — una respuesta corta, hablada, en español natural, como si se la dijeras en voz alta a la persona (máximo 2-3 frases). ' +
+      'mercado: usa este tipo cuando la persona pide agregar uno o varios productos a la lista o al carrito de mercado/compras (ej: "agrega atún al mercado", "pon leche en el carrito", "agrégame pan, huevos, leche y pollo"). campos: {"productos": arreglo de strings, UNO por cada producto mencionado en la frase — si menciona varios, inclúyelos TODOS, nunca solo el último}. ' +
+      'consulta: usa este tipo cuando la persona hace una PREGUNTA sobre algo que ya tiene guardado (ej: "¿cuándo es el cumpleaños de Juan?", "¿cuánto llevo gastado en mercado?", "¿qué pagos me faltan?", "¿a qué hora me toca el losartán?", "¿tengo actividades hoy?", "¿qué tengo esta semana?"). Para preguntas sobre actividades, revisa "actividadesProximosDias" y menciona los nombres y horas concretos que encuentres ahí. Responde usando ÚNICAMENTE los datos del contexto de arriba — si no tienes esa información en el contexto, dilo claramente en vez de inventar. campos: {"respuesta": string} — una respuesta corta, hablada, en español natural, como si se la dijeras en voz alta a la persona (máximo 2-3 frases). ' +
       'signos: usa este tipo cuando la persona quiera registrar un signo vital (presión arterial, frecuencia cardíaca, glicemia o peso) (ej: "mi presión hoy fue 120 sobre 80", "registra mi glicemia en 95", "mi peso es 68 kilos"). campos: sistolica (number o null), diastolica (number o null), fc (number o null, frecuencia cardíaca), glicemia (number o null), peso (number o null), fecha (YYYY-MM-DD, hoy si no se menciona otra). Deja en null cualquier valor que no se haya mencionado en la frase. ' +
       'Si la frase no calza claramente con ninguno de estos, responde tipo "desconocido" con campos vacío {}.';
 
@@ -101,7 +92,6 @@ module.exports = async (req, res) => {
 
     res.status(200).json(parsed);
   } catch (err) {
-    console.error('[ai-assist] excepción:', err);
     res.status(500).json({ error: 'server_error' });
   }
 };
