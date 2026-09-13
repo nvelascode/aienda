@@ -91,7 +91,14 @@
   }
   .metrica-chip button{ border:none;background:none;color:var(--moss);font-weight:800;cursor:pointer;padding:0;font-size:13px; }
 
-  .topbar-actions{ margin-left:auto; display:flex; gap:8px; }
+  .topbar-actions{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+  #save-indicator{
+    font-size:11.5px;font-weight:800;color:var(--ink-soft);
+    opacity:0;transition:opacity .3s ease;white-space:nowrap;
+  }
+  #save-indicator.show{opacity:1;}
+  #save-indicator.saved{color:var(--moss);}
+  #save-indicator.error{color:var(--brick);}
   .dark-toggle-btn, .gear-btn{
     border:none;background:var(--shell);border:1px solid var(--line);
     width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer;transition:background .2s;
@@ -547,6 +554,7 @@
       <div class="sub">Tu agenda del día a día</div>
     </div>
     <div class="topbar-actions">
+      <span id="save-indicator"></span>
       <button class="gear-btn" id="btn-settings" title="Configuración">⚙️</button>
       <button class="dark-toggle-btn" id="btn-search-toggle" title="Buscar">🔍</button>
     </div>
@@ -965,17 +973,37 @@ async function loadState(){
   }catch(e){ console.error('No se pudo cargar desde Supabase', e); }
 }
 
+let saveIndicatorHideTimer = null;
+function showSaveIndicator(text, kind){
+  const el = document.getElementById('save-indicator');
+  if(!el) return;
+  el.textContent = text;
+  el.className = 'show' + (kind ? ' '+kind : '');
+  clearTimeout(saveIndicatorHideTimer);
+}
+function scheduleHideSaveIndicator(){
+  clearTimeout(saveIndicatorHideTimer);
+  saveIndicatorHideTimer = setTimeout(()=>{
+    const el = document.getElementById('save-indicator');
+    if(el) el.classList.remove('show');
+  }, 1800);
+}
+
 function saveState(){
   if(!currentUser) return;
+  showSaveIndicator('Guardando…');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async ()=>{
     try{
       const { error } = await sb.from('aienda_data').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
       if(error) throw error;
+      showSaveIndicator('Guardado ✓', 'saved');
     }catch(e){
       console.error('No se pudo guardar en Supabase', e);
       showToast('No se pudo guardar. Revisa tu conexión.', 'error');
+      showSaveIndicator('No se guardó', 'error');
     }
+    scheduleHideSaveIndicator();
   }, 400);
 }
 
@@ -1793,11 +1821,14 @@ function renderPagos(){
 
       const delBtn = document.createElement('button');
       delBtn.className='link-btn'; delBtn.style.padding='0'; delBtn.style.color='var(--brick)'; delBtn.textContent='✕ Eliminar';
-      delBtn.onclick = ()=> scheduleDelete(p.id, p.nombre, ()=>{
-        state.pagos = state.pagos.filter(x=>x.id!==p.id);
-        delete state.pagosStatus[p.id];
-        saveState();
-      });
+      delBtn.onclick = ()=>{
+        if(!confirm('¿Eliminar el pago "'+p.nombre+'"? Se perderá el día y la frecuencia configurados.')) return;
+        scheduleDelete(p.id, p.nombre, ()=>{
+          state.pagos = state.pagos.filter(x=>x.id!==p.id);
+          delete state.pagosStatus[p.id];
+          saveState();
+        });
+      };
       actions.appendChild(delBtn);
       card.appendChild(actions);
     }
@@ -1927,10 +1958,13 @@ function renderMedsList(){
     actions.appendChild(editBtn);
     const delBtn=document.createElement('button');
     delBtn.className='link-btn'; delBtn.style.padding='0'; delBtn.style.color='var(--brick)'; delBtn.textContent='✕ Eliminar';
-    delBtn.onclick = ()=> scheduleDelete(m.id, m.nombre, ()=>{
-      state.medicamentos = state.medicamentos.filter(x=>x.id!==m.id);
-      saveState();
-    });
+    delBtn.onclick = ()=>{
+      if(!confirm('¿Eliminar "'+m.nombre+'"? Se perderán la dosis y los horarios configurados.')) return;
+      scheduleDelete(m.id, m.nombre, ()=>{
+        state.medicamentos = state.medicamentos.filter(x=>x.id!==m.id);
+        saveState();
+      });
+    };
     actions.appendChild(delBtn);
     card.appendChild(actions);
     holder.appendChild(card);
@@ -2418,9 +2452,8 @@ function buildSimpleDayCard(d){
 
 function renderHomeWeekSection(offset, holderId, emptyText){
   const holder = document.getElementById(holderId);
-  const dates = getWeekDates(offset);
-  const hasContent = dates.some(d => buildDayItems(d).length>0 || bdaysOn(d).length>0);
-  if(!hasContent){
+  const dates = getWeekDates(offset).filter(d => buildDayItems(d).length>0 || bdaysOn(d).length>0);
+  if(dates.length===0){
     holder.className = '';
     holder.innerHTML = '<div class="empty-note">'+emptyText+'</div>';
     return;
