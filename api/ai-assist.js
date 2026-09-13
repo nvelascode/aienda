@@ -1,21 +1,8 @@
 // api/ai-assist.js
-// La lista de correos permitidos vive en la tabla ai_allowed_users de Supabase
-// (misma tabla que consulta ai-check.js) — se administra desde ahí, no aquí.
-
 const SUPABASE_URL = 'https://hymclqcdpplamdinfrhb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_-PXExRRGp6CTYxgGd5ftBA_aIHY_04D';
 
-async function tieneAcceso(email) {
-  const SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  if (!SECRET_KEY) return false;
-  const checkRes = await fetch(
-    SUPABASE_URL + '/rest/v1/ai_allowed_users?email=eq.' + encodeURIComponent(email) + '&select=email',
-    { headers: { apikey: SECRET_KEY, Authorization: 'Bearer ' + SECRET_KEY } }
-  );
-  if (!checkRes.ok) return false;
-  const rows = await checkRes.json();
-  return Array.isArray(rows) && rows.length > 0;
-}
+const ALLOWED_EMAILS = ['nvelascop@ismm.edu.co', 'silvitapinzon2015@gmail.com', 'judys_90@hotmail.com'];
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -41,7 +28,7 @@ module.exports = async (req, res) => {
     const user = await userRes.json();
     const email = (user.email || '').toLowerCase();
 
-    if (!(await tieneAcceso(email))) {
+    if (!ALLOWED_EMAILS.includes(email)) {
       res.status(403).json({ error: 'no_access' });
       return;
     }
@@ -57,8 +44,6 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // Fecha de referencia en hora de Bogotá (no UTC), para que "hoy" coincida
-    // con lo que la app muestra en el teléfono, sobre todo en horas de la noche.
     const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
     const listaCategorias = Array.isArray(categorias) ? categorias.join(', ') : '';
     const contextoJson = contexto ? JSON.stringify(contexto) : '{}';
@@ -67,7 +52,7 @@ module.exports = async (req, res) => {
       'Eres un asistente que convierte frases en español en un objeto JSON para una app de organización personal. ' +
       'Hoy es ' + hoy + ' (formato YYYY-MM-DD). Categorías de gasto ya existentes en la app: [' + listaCategorias + ']. ' +
       'Estos son los datos actuales guardados por esta persona (úsalos SOLO para responder preguntas, tipo "consulta"): ' + contextoJson + '. ' +
-      'El contexto trae estas secciones: "actividadesProximosDias" (arreglo de los próximos 7 días, el que tiene esHoy:true es hoy, cada uno con su lista "actividades"), "cumpleanos", "pagos", "presupuesto" (categorías con presupuestoMensual y gastadoEsteMes), "medicamentos", "mercado" (con "enCarritoPendiente": lo que falta comprar, "enCarritoYaComprado": lo ya marcado como comprado, y "listaPredeterminadaCompleta": todos los productos que existen en la lista aunque no estén en el carrito), y "signosVitalesRecientes" (los últimos registros de presión, frecuencia cardíaca, glicemia, peso y otras métricas personalizadas, más reciente primero). ' +
+      'El contexto trae estas secciones: "actividadesProximosDias" (arreglo de los próximos 7 días, el que tiene esHoy:true es hoy, cada uno con su lista "actividades"), "proximosCompromisosPuntuales" (TODAS las citas o eventos de un solo día que la persona tiene agendados a futuro, sin importar qué tan lejos estén — úsala para preguntas sobre una cita específica que puede caer más allá de los próximos 7 días, ej. "¿cuándo es mi cita de audiología?"), "cumpleanos", "pagos", "presupuesto" (categorías con presupuestoMensual y gastadoEsteMes), "medicamentos", "mercado" (con "enCarritoPendiente": lo que falta comprar, "enCarritoYaComprado": lo ya marcado como comprado, y "listaPredeterminadaCompleta": todos los productos que existen en la lista aunque no estén en el carrito), y "signosVitalesRecientes" (los últimos registros de presión, frecuencia cardíaca, glicemia, peso y otras métricas personalizadas, más reciente primero). ' +
       'Responde SOLO con JSON válido, sin explicación ni texto adicional, con esta forma exacta: ' +
       '{"tipo":"gasto|actividad|cumpleanos|pago|medicamento|categoria|mercado|consulta|signos|desconocido","campos":{}}. ' +
       'Según el tipo, "campos" debe tener EXACTAMENTE estas llaves: ' +
@@ -78,7 +63,7 @@ module.exports = async (req, res) => {
       'medicamento: nombre (string), dosis (string, puede ser ""), horarios (arreglo de strings HH:MM en 24 horas). ' +
       'categoria: usa este tipo SOLO si la persona pide explícitamente crear/agregar una categoría de presupuesto (ej: "crea la categoría transporte", "agrega una categoría de mascotas con 100 mil"). campos: nombre (string), monto (number, 0 si no menciona un monto). ' +
       'mercado: usa este tipo cuando la persona pide agregar uno o varios productos a la lista o al carrito de mercado/compras (ej: "agrega atún al mercado", "pon leche en el carrito", "agrégame pan, huevos, leche y pollo"). campos: {"productos": arreglo de strings, UNO por cada producto mencionado en la frase — si menciona varios, inclúyelos TODOS, nunca solo el último}. ' +
-      'consulta: usa este tipo cuando la persona hace una PREGUNTA sobre algo que ya tiene guardado en cualquiera de las secciones del contexto (actividades, cumpleaños, pagos, presupuesto/gastos, medicamentos, mercado, o signos vitales) — por ejemplo "¿qué tengo que comprar?", "¿cuánto llevo gastado en mercado?", "¿qué pagos me faltan?", "¿a qué hora me toca el losartán?", "¿tengo actividades hoy?", "¿cuál fue mi última presión arterial?". Para preguntas de mercado usa "enCarritoPendiente" (lo que falta comprar) salvo que la persona pregunte específicamente por lo ya comprado o por toda la lista. Responde usando ÚNICAMENTE los datos del contexto de arriba — si no tienes esa información en el contexto (por ejemplo, la sección relevante viene vacía), dilo claramente en vez de inventar. campos: {"respuesta": string} — una respuesta corta, hablada, en español natural, como si se la dijeras en voz alta a la persona (máximo 2-3 frases). ' +
+      'consulta: usa este tipo cuando la persona hace una PREGUNTA sobre algo que ya tiene guardado en cualquiera de las secciones del contexto (actividades, citas puntuales, cumpleaños, pagos, presupuesto/gastos, medicamentos, mercado, o signos vitales) — por ejemplo "¿qué tengo que comprar?", "¿cuándo es mi cita de audiología?", "¿cuánto llevo gastado en mercado?", "¿qué pagos me faltan?", "¿a qué hora me toca el losartán?", "¿tengo actividades hoy?", "¿cuál fue mi última presión arterial?". Revisa TANTO "actividadesProximosDias" COMO "proximosCompromisosPuntuales" antes de decir que no tienes la información — una cita puede estar guardada más allá de los próximos 7 días. Para preguntas de mercado usa "enCarritoPendiente" (lo que falta comprar) salvo que la persona pregunte específicamente por lo ya comprado o por toda la lista. Responde usando ÚNICAMENTE los datos del contexto de arriba — si de verdad no encuentras esa información en ninguna sección, dilo claramente en vez de inventar. campos: {"respuesta": string} — una respuesta corta, hablada, en español natural, como si se la dijeras en voz alta a la persona (máximo 2-3 frases). ' +
       'signos: usa este tipo cuando la persona quiera registrar un signo vital (presión arterial, frecuencia cardíaca, glicemia o peso) (ej: "mi presión hoy fue 120 sobre 80", "registra mi glicemia en 95", "mi peso es 68 kilos"). campos: sistolica (number o null), diastolica (number o null), fc (number o null, frecuencia cardíaca), glicemia (number o null), peso (number o null), fecha (YYYY-MM-DD, hoy si no se menciona otra). Deja en null cualquier valor que no se haya mencionado en la frase. ' +
       'Si la frase no calza claramente con ninguno de estos, responde tipo "desconocido" con campos vacío {}.';
 
