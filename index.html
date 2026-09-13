@@ -336,6 +336,11 @@
     position:fixed; right:18px; bottom:96px; width:52px; height:52px; border-radius:50%;
     background:#fff; color:var(--ink); border:2px solid var(--yolk-dark); font-size:22px; cursor:pointer;
     box-shadow:0 6px 16px -4px rgba(0,0,0,.35); z-index:30; display:flex; align-items:center; justify-content:center;
+    animation: ai-breathe 2.4s ease-in-out infinite;
+  }
+  @keyframes ai-breathe{
+    0%,100%{ transform:scale(1); box-shadow:0 6px 16px -4px rgba(0,0,0,.35); }
+    50%{ transform:scale(1.07); box-shadow:0 8px 20px -4px rgba(217,154,43,.55); }
   }
   .ai-fab.hidden{ display:none !important; }
 
@@ -616,6 +621,10 @@
       Pagos fijos
       <button class="pill-btn yolk" id="btn-toggle-edit-pagos">✏️ Editar</button>
     </div>
+    <div class="rep-row" style="margin-bottom:12px;">
+      <button type="button" class="rep-btn selected" id="pagos-sub-pendientes" data-sub="pendientes">Pendientes</button>
+      <button type="button" class="rep-btn" id="pagos-sub-pagados" data-sub="pagados">Pagados</button>
+    </div>
     <div id="pagos-list"></div>
     <button class="pill-btn yolk hidden" id="btn-add-pago" style="width:100%;margin-top:8px;">+ Agregar pago</button>
   </div>
@@ -832,6 +841,7 @@ let state = blankState();
 
 let activitiesWeekStart = getMonday(new Date()); // referencia de semana para la pestaña Actividades (independiente de "hoy")
 let editModePagos = false;
+let pagosSubTab = 'pendientes'; // 'pendientes' o 'pagados' — cuál lista se muestra en la pestaña Pagos
 let editModeMercado = false;
 let editModePresupuesto = false;
 let darkOverride = null; // null = automático según la hora; true/false = forzado a mano por el botón
@@ -1354,6 +1364,11 @@ function renderPresupuesto(){
       state.presupuesto.gastos = state.presupuesto.gastos.filter(x=>x.id!==g.id);
       saveState();
     });
+    const edit=document.createElement('button');
+    edit.className='link-btn'; edit.style.cssText='padding:0;margin-right:14px;';
+    edit.textContent='✏️ Editar';
+    edit.onclick=()=> openGastoModal(g);
+    row.appendChild(edit);
     row.appendChild(del);
     gholder.appendChild(row);
   });
@@ -1383,7 +1398,10 @@ function openCategoriaModal(existing, prefill){
   };
 }
 
-function openGastoModal(prefill){
+function openGastoModal(datos){
+  const existing = datos && datos.id ? datos : null; // si trae id, es un gasto real que se está editando
+  const prefill = existing ? null : datos; // si no trae id, es un prellenado de la IA para uno nuevo
+  const base = existing || prefill;
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
@@ -1398,32 +1416,36 @@ function openGastoModal(prefill){
     document.getElementById('gasto-cerrar').onclick = ()=>{ root.innerHTML=''; };
     return;
   }
-  modal.innerHTML = '<h3>Registrar gasto</h3>'+
+  modal.innerHTML = '<h3>'+(existing?'Editar gasto':'Registrar gasto')+'</h3>'+
     (prefill?'<p style="font-size:12px;color:var(--ink-soft);margin-top:-8px;">✨ Revisa lo que entendí antes de guardar.</p>':'')+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
-        '<div style="flex:1;"><label>¿En qué?</label><input id="gasto-nombre" placeholder="Ej: Almuerzo" value="'+(prefill&&prefill.nombre?esc(prefill.nombre):'')+'"></div>'+
+        '<div style="flex:1;"><label>¿En qué?</label><input id="gasto-nombre" placeholder="Ej: Almuerzo" value="'+(base&&base.nombre?esc(base.nombre):'')+'"></div>'+
         '<span id="gasto-mic-holder"></span>'+
       '</div>'+
       '<div class="form-two">'+
-        '<div class="frow"><label>Monto</label><input id="gasto-monto" type="number" min="0" placeholder="Ej: 25000" value="'+(prefill&&prefill.monto?prefill.monto:'')+'"></div>'+
+        '<div class="frow"><label>Monto</label><input id="gasto-monto" type="number" min="0" placeholder="Ej: 25000" value="'+(base&&base.monto?base.monto:'')+'"></div>'+
         '<div class="frow"><label>Categoría</label><select id="gasto-categoria" class="settings-input">'+
-          cats.map(c=>'<option value="'+c.id+'"'+(prefill&&prefill.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
+          cats.map(c=>'<option value="'+c.id+'"'+(base&&base.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
         '</select></div>'+
       '</div>'+
       '<div class="frow"><label>Fecha</label><input id="gasto-fecha" type="date"></div>'+
     '</div>'+
-    '<button class="close-btn" id="gasto-save">Guardar gasto</button>';
+    '<button class="close-btn" id="gasto-save">'+(existing?'Guardar cambios':'Guardar gasto')+'</button>';
   bg.appendChild(modal); root.appendChild(bg);
   document.getElementById('gasto-mic-holder').appendChild(makeMicButton(document.getElementById('gasto-nombre')));
-  document.getElementById('gasto-fecha').value = (prefill&&prefill.fecha) || dateKey(new Date());
+  document.getElementById('gasto-fecha').value = (base&&base.fecha) || dateKey(new Date());
   document.getElementById('gasto-save').onclick = ()=>{
     const nombre = document.getElementById('gasto-nombre').value.trim();
     const monto = parseFloat(document.getElementById('gasto-monto').value);
     const categoriaId = document.getElementById('gasto-categoria').value;
     const fecha = document.getElementById('gasto-fecha').value || dateKey(new Date());
     if(!nombre || isNaN(monto) || monto<=0) return;
-    state.presupuesto.gastos.push({id:uid(), nombre, monto, categoriaId, fecha});
+    if(existing){
+      existing.nombre = nombre; existing.monto = monto; existing.categoriaId = categoriaId; existing.fecha = fecha;
+    } else {
+      state.presupuesto.gastos.push({id:uid(), nombre, monto, categoriaId, fecha});
+    }
     saveState(); root.innerHTML=''; renderAll();
   };
 }
@@ -1795,9 +1817,21 @@ function renderPagos(){
   const holder = document.getElementById('pagos-list');
   holder.innerHTML='';
   const today = new Date();
-  const sorted = [...state.pagos].sort((a,b)=> pagoInfo(a,today).diffDays - pagoInfo(b,today).diffDays);
+  const conInfo = state.pagos.map(p=> ({ p, info: pagoInfo(p, today) }));
+  const pendientes = conInfo.filter(x=> !x.info.paid).sort((a,b)=> a.info.diffDays - b.info.diffDays);
+  const pagados = conInfo.filter(x=> x.info.paid).sort((a,b)=> a.p.nombre.localeCompare(b.p.nombre,'es'));
+
+  const btnPend = document.getElementById('pagos-sub-pendientes');
+  const btnPag = document.getElementById('pagos-sub-pagados');
+  if(btnPend) btnPend.textContent = 'Pendientes ('+pendientes.length+')';
+  if(btnPag) btnPag.textContent = 'Pagados ('+pagados.length+')';
+  if(btnPend) btnPend.classList.toggle('selected', pagosSubTab==='pendientes');
+  if(btnPag) btnPag.classList.toggle('selected', pagosSubTab==='pagados');
+
+  const sorted = (pagosSubTab==='pagados' ? pagados : pendientes).map(x=>x.p);
+
   if(sorted.length===0){
-    holder.innerHTML = '<div class="empty-note">Aún no hay pagos agregados.</div>';
+    holder.innerHTML = '<div class="empty-note">'+(pagosSubTab==='pagados' ? 'Aún no has marcado ningún pago como pagado este mes.' : (state.pagos.length===0 ? 'Aún no hay pagos agregados.' : '¡Todo al día! No tienes pagos pendientes.'))+'</div>';
     return;
   }
   sorted.forEach(p=>{
@@ -3070,8 +3104,8 @@ function renderSettingsCategory(key){
 
   } else if(key==='inicio'){
     modal.innerHTML = header+
-      '<label class="settings-row"><span>🌤️ Mostrar barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
       '<label class="settings-row"><span>📖 Versículo diario</span><input type="checkbox" id="settings-versiculos" '+(state.settings.versiculosEnabled?'checked':'')+'></label>'+
+      '<label class="settings-row"><span>🌤️ Mostrar barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
       '<div class="settings-subtitle">Ciudad para el clima</div>'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-start;">'+
         '<input id="settings-city" class="settings-input" placeholder="Ej: Medellín, Cali..." style="flex:1;">'+
@@ -3309,6 +3343,8 @@ document.getElementById('btn-toggle-edit-pagos').onclick = ()=>{
   document.getElementById('btn-add-pago').classList.toggle('hidden', !editModePagos);
   renderPagos();
 };
+document.getElementById('pagos-sub-pendientes').onclick = ()=>{ pagosSubTab='pendientes'; renderPagos(); };
+document.getElementById('pagos-sub-pagados').onclick = ()=>{ pagosSubTab='pagados'; renderPagos(); };
 document.getElementById('btn-toggle-edit-mercado').onclick = ()=>{
   editModeMercado = !editModeMercado;
   document.getElementById('btn-toggle-edit-mercado').textContent = editModeMercado ? '✓ Listo' : '✏️ Editar';
