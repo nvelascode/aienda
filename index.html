@@ -2549,6 +2549,7 @@ async function procesarTextoIA(texto, root, estadoEl){
 
 function construirContextoIA(){
   const hoy = new Date();
+  const hoyKey = dateKey(hoy);
   const dias = [];
   for(let i=0;i<7;i++){
     const d = new Date(hoy);
@@ -2561,6 +2562,14 @@ function construirContextoIA(){
       actividades: items.map(it=>({ nombre:it.texto, hora:it.hora||null, notas:it.notas||'' }))
     });
   }
+  // Citas o eventos puntuales (no recurrentes) de cualquier fecha futura, aunque
+  // estén más allá de los próximos 7 días — para que preguntas sobre una cita
+  // lejana ("¿cuándo es mi cita de audiología?") sí encuentren el dato.
+  const proximosCompromisosPuntuales = state.compromisos
+    .filter(c=> c.date >= hoyKey)
+    .sort((a,b)=> (a.date+a.hora).localeCompare(b.date+b.hora))
+    .slice(0, 100)
+    .map(c=>({ nombre:c.nombre, fecha:c.date, hora:c.hora||null, notas:c.notas||'' }));
   const signosRecientes = [...state.signosVitales]
     .sort((a,b)=> (b.fecha+b.hora).localeCompare(a.fecha+a.hora))
     .slice(0, 10)
@@ -2576,6 +2585,7 @@ function construirContextoIA(){
     }));
   return {
     actividadesProximosDias: dias,
+    proximosCompromisosPuntuales: proximosCompromisosPuntuales,
     cumpleanos: state.cumpleanos.map(c=>({ nombre:c.nombre, dia:c.dia, mes:c.mes })),
     pagos: state.pagos.map(p=>{
       const info = pagoInfo(p, hoy);
