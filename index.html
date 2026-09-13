@@ -460,6 +460,14 @@
     padding:12px 14px;margin-bottom:8px;font-size:14px;font-weight:800;cursor:pointer;
   }
   .settings-row input[type="checkbox"]{width:20px;height:20px;accent-color:var(--moss);}
+  button.settings-row{ width:100%; text-align:left; font:inherit; color:inherit; }
+  .settings-row .chevron{ color:var(--ink-soft); font-size:16px; }
+  .settings-back-row{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .settings-back-btn{
+    border:none; background:var(--moss-light); color:var(--moss);
+    width:34px; height:34px; border-radius:50%; font-size:18px; font-weight:800; cursor:pointer; flex-shrink:0;
+  }
+  .settings-back-row h3{ margin:0; }
   .settings-input{
     width:100%;border:1.5px solid var(--line);border-radius:11px;
     padding:9px 11px;font-size:14px;font-family:inherit;font-weight:700;color:var(--ink);
@@ -2940,160 +2948,212 @@ function refreshAccountInfo(){
   if(el && currentUser) el.textContent = currentUser.email;
 }
 
+const SETTINGS_CATEGORIES = [
+  {key:'cuenta',          label:'Cuenta',                     icon:'👤'},
+  {key:'apariencia',      label:'Apariencia',                 icon:'🎨'},
+  {key:'pestanas',        label:'Pestañas',                   icon:'🗂️'},
+  {key:'inicio',          label:'Inicio',                     icon:'🏠'},
+  {key:'voz',             label:'Voz y asistente de IA',      icon:'🎤'},
+  {key:'notificaciones',  label:'Notificaciones',             icon:'🔔'},
+];
+
 function openSettingsModal(){
+  renderSettingsMenu();
+}
+
+function renderSettingsMenu(){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
-  const rows = TAB_DEFS.map(t=>
-    '<label class="settings-row"><span>'+t.icon+' '+t.label+'</span><input type="checkbox" data-tabkey="'+t.key+'" '+(state.settings.tabs[t.key]?'checked':'')+'></label>'
-  ).join('');
-  const swatches = THEMES.map(t=>
-    '<div class="swatch'+(state.settings.theme===t.key?' selected':'')+'" data-theme="'+t.key+'" style="background:'+t.color+';" title="'+t.label+'"></div>'
-  ).join('');
-  const avatars = AVATAR_OPTIONS.map(a=>
-    '<div class="avatar-opt'+(state.settings.avatar===a?' selected':'')+'" data-avatar="'+a+'">'+a+'</div>'
-  ).join('');
-  const TEXT_SIZES = [{v:1,l:'Normal',fs:'14px'},{v:1.15,l:'Grande',fs:'18px'},{v:1.3,l:'Muy grande',fs:'22px'}];
-  const textSizeBtns = TEXT_SIZES.map(t=>
-    '<button class="textsize-opt'+((state.settings.textScale||1)===t.v?' selected':'')+'" data-scale="'+t.v+'" style="font-size:'+t.fs+';">A<div style="font-size:10px;font-weight:700;margin-top:2px;">'+t.l+'</div></button>'
-  ).join('');
   modal.innerHTML = '<h3>⚙️ Configuración</h3>'+
-    '<div class="settings-subtitle">Cuenta</div>'+
-    '<div class="settings-row" style="cursor:default;"><span>✉️ <span id="settings-account-email">'+(currentUser?esc(currentUser.email):'')+'</span></span></div>'+
-    '<button class="link-btn" id="btn-logout" style="padding:0 2px;color:var(--brick);margin-bottom:10px;">Cerrar sesión</button>'+
-    '<div class="settings-subtitle">Nombre</div>'+
-    '<div class="frow"><input id="settings-name" class="settings-input" value="'+esc(state.settings.appName||'Aienda')+'" placeholder="Ej: María"></div>'+
-    '<div class="settings-subtitle">Avatar</div>'+
-    '<div class="avatar-row">'+avatars+'</div>'+
-    '<div class="settings-subtitle">Paleta de colores</div>'+
-    '<div class="swatch-row">'+swatches+'</div>'+
-    '<div class="settings-subtitle">Tamaño de letra</div>'+
-    '<div class="textsize-row">'+textSizeBtns+'</div>'+
-    '<div class="settings-subtitle">Pestañas</div>'+
-    '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas alguna pestaña, tu información no se pierde, solamente deja de ser visible.</p>'+
-    '<div class="settings-group">'+rows+'</div>'+
-    '<div class="settings-subtitle">Clima</div>'+
-    '<label class="settings-row"><span>🌤️ Mostrar barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
-    '<label class="settings-row"><span>📖 Versículo diario</span><input type="checkbox" id="settings-versiculos" '+(state.settings.versiculosEnabled?'checked':'')+'></label>'+
-    '<div class="frow" style="display:flex;gap:8px;align-items:flex-start;">'+
-      '<input id="settings-city" class="settings-input" placeholder="Ej: Medellín, Cali..." style="flex:1;">'+
-      '<button class="pill-btn yolk" id="settings-city-save" style="white-space:nowrap;">Buscar</button>'+
-    '</div>'+
-    '<p style="font-size:12px;color:var(--ink-soft);margin-top:-4px;margin-bottom:12px;">Ciudad actual: <span id="settings-city-current">'+esc((state.settings.weatherLocation&&state.settings.weatherLocation.name)||'Bogotá')+'</span></p>'+
-    '<label class="settings-row"><span>🎤 Dictado por voz</span><input type="checkbox" id="settings-mic" '+(state.settings.micEnabled?'checked':'')+'></label>'+
-    '<label class="settings-row"><span>🌙 Modo oscuro</span><input type="checkbox" id="settings-darkmode" '+(document.body.classList.contains('dark-mode')?'checked':'')+'></label>'+
-    '<label class="settings-row"><span>🔔 Notificaciones push</span><input type="checkbox" id="settings-push" '+(state.settings.pushEnabled?'checked':'')+'></label>'+
-    '<label class="settings-row"><span>🤖 Asistente de IA (beta)</span><input type="checkbox" id="settings-ai" '+(state.settings.aiEnabled?'checked':'')+'></label>'+
+    SETTINGS_CATEGORIES.map(c=>
+      '<button class="settings-row" data-cat="'+c.key+'"><span>'+c.icon+' '+c.label+'</span><span class="chevron">›</span></button>'
+    ).join('')+
     '<button class="close-btn" id="settings-close">Cerrar</button>';
   bg.appendChild(modal); root.appendChild(bg);
-
-  document.getElementById('btn-logout').onclick = signOut;
-
-  document.getElementById('settings-name').onchange = (e)=>{
-    const val = e.target.value.trim();
-    state.settings.appName = val || 'Aienda';
-    saveState(); applyPersonalization(); renderAll();
-    showToast('Nombre actualizado', 'ok');
-  };
-  modal.querySelectorAll('.avatar-opt').forEach(el=>{
-    el.onclick = ()=>{
-      state.settings.avatar = el.dataset.avatar;
-      saveState(); applyPersonalization();
-      modal.querySelectorAll('.avatar-opt').forEach(x=>x.classList.remove('selected'));
-      el.classList.add('selected');
-    };
+  modal.querySelectorAll('[data-cat]').forEach(btn=>{
+    btn.onclick = ()=> renderSettingsCategory(btn.dataset.cat);
   });
-  modal.querySelectorAll('.swatch').forEach(el=>{
-    el.onclick = ()=>{
-      state.settings.theme = el.dataset.theme;
-      saveState(); applyPersonalization();
-      modal.querySelectorAll('.swatch').forEach(x=>x.classList.remove('selected'));
-      el.classList.add('selected');
-    };
-  });
-  modal.querySelectorAll('.textsize-opt').forEach(el=>{
-    el.onclick = ()=>{
-      state.settings.textScale = parseFloat(el.dataset.scale);
-      saveState(); applyTextScale();
-      modal.querySelectorAll('.textsize-opt').forEach(x=>x.classList.remove('selected'));
-      el.classList.add('selected');
-    };
-  });
-
-  modal.querySelectorAll('input[data-tabkey]').forEach(inp=>{
-    inp.onchange = ()=>{
-      state.settings.tabs[inp.dataset.tabkey] = inp.checked;
-      saveState(); applyTabVisibility();
-    };
-  });
-  document.getElementById('settings-weather').onchange = (e)=>{
-    state.settings.weatherEnabled = e.target.checked;
-    saveState(); applyWeatherVisibility();
-  };
-  document.getElementById('settings-versiculos').onchange = (e)=>{
-    state.settings.versiculosEnabled = e.target.checked;
-    saveState(); applyVersiculosVisibility();
-  };
-  document.getElementById('settings-city-save').onclick = async ()=>{
-    const query = document.getElementById('settings-city').value.trim();
-    if(!query){ showToast('Escribe una ciudad', 'error'); return; }
-    const btn = document.getElementById('settings-city-save');
-    btn.disabled = true; btn.textContent = 'Buscando...';
-    try{
-      const found = await buscarCiudad(query);
-      btn.disabled = false; btn.textContent = 'Buscar';
-      if(!found){ showToast('No se encontró esa ciudad', 'error'); return; }
-      state.settings.weatherLocation = found;
-      saveState();
-      document.getElementById('settings-city-current').textContent = found.name;
-      document.getElementById('settings-city').value = '';
-      loadWeather();
-      showToast('Ciudad actualizada', 'ok');
-    }catch(e){
-      btn.disabled = false; btn.textContent = 'Buscar';
-      showToast('No se pudo buscar la ciudad', 'error');
-    }
-  };
-  document.getElementById('settings-city').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('settings-city-save').click(); });
-  document.getElementById('settings-mic').onchange = (e)=>{
-    state.settings.micEnabled = e.target.checked;
-    saveState(); applyMicVisibility();
-  };
-  document.getElementById('settings-darkmode').onchange = (e)=>{
-    darkOverride = e.target.checked;
-    applyDarkMode();
-  };
-  document.getElementById('settings-push').onchange = async (e)=>{
-    if(e.target.checked){
-      const ok = await enablePush();
-      if(!ok){ e.target.checked = false; return; }
-      state.settings.pushEnabled = true;
-      showToast('Notificaciones activadas', 'ok');
-    } else {
-      await disablePush();
-      state.settings.pushEnabled = false;
-    }
-    saveState();
-  };
-  document.getElementById('settings-ai').onchange = async (e)=>{
-    if(e.target.checked){
-      e.target.disabled = true;
-      const allowed = await checkAIAccess();
-      e.target.disabled = false;
-      if(!allowed){
-        e.target.checked = false;
-        showPaywallModal();
-        return;
-      }
-      state.settings.aiEnabled = true;
-    } else {
-      state.settings.aiEnabled = false;
-    }
-    saveState(); applyAIVisibility();
-  };
   document.getElementById('settings-close').onclick = ()=>{ root.innerHTML=''; };
+}
+
+function renderSettingsCategory(key){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const cat = SETTINGS_CATEGORIES.find(c=>c.key===key);
+  const header = '<div class="settings-back-row"><button class="settings-back-btn" id="settings-back">‹</button><h3>'+cat.icon+' '+cat.label+'</h3></div>';
+
+  if(key==='cuenta'){
+    modal.innerHTML = header+
+      '<div class="settings-row" style="cursor:default;"><span>✉️ '+(currentUser?esc(currentUser.email):'')+'</span></div>'+
+      '<button class="link-btn" id="btn-logout" style="padding:8px 2px;color:var(--brick);">Cerrar sesión</button>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('btn-logout').onclick = signOut;
+
+  } else if(key==='apariencia'){
+    const swatches = THEMES.map(t=>
+      '<div class="swatch'+(state.settings.theme===t.key?' selected':'')+'" data-theme="'+t.key+'" style="background:'+t.color+';" title="'+t.label+'"></div>'
+    ).join('');
+    const avatars = AVATAR_OPTIONS.map(a=>
+      '<div class="avatar-opt'+(state.settings.avatar===a?' selected':'')+'" data-avatar="'+a+'">'+a+'</div>'
+    ).join('');
+    const TEXT_SIZES = [{v:1,l:'Normal',fs:'14px'},{v:1.15,l:'Grande',fs:'18px'},{v:1.3,l:'Muy grande',fs:'22px'}];
+    const textSizeBtns = TEXT_SIZES.map(t=>
+      '<button class="textsize-opt'+((state.settings.textScale||1)===t.v?' selected':'')+'" data-scale="'+t.v+'" style="font-size:'+t.fs+';">A<div style="font-size:10px;font-weight:700;margin-top:2px;">'+t.l+'</div></button>'
+    ).join('');
+    modal.innerHTML = header+
+      '<div class="settings-subtitle" style="margin-top:0;">Nombre</div>'+
+      '<div class="frow"><input id="settings-name" class="settings-input" value="'+esc(state.settings.appName||'Aienda')+'" placeholder="Ej: María"></div>'+
+      '<div class="settings-subtitle">Avatar</div>'+
+      '<div class="avatar-row">'+avatars+'</div>'+
+      '<div class="settings-subtitle">Paleta de colores</div>'+
+      '<div class="swatch-row">'+swatches+'</div>'+
+      '<div class="settings-subtitle">Tamaño de letra</div>'+
+      '<div class="textsize-row">'+textSizeBtns+'</div>'+
+      '<div class="settings-subtitle">Pantalla</div>'+
+      '<label class="settings-row"><span>🌙 Modo oscuro</span><input type="checkbox" id="settings-darkmode" '+(document.body.classList.contains('dark-mode')?'checked':'')+'></label>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('settings-name').onchange = (e)=>{
+      const val = e.target.value.trim();
+      state.settings.appName = val || 'Aienda';
+      saveState(); applyPersonalization(); renderAll();
+      showToast('Nombre actualizado', 'ok');
+    };
+    modal.querySelectorAll('.avatar-opt').forEach(el=>{
+      el.onclick = ()=>{
+        state.settings.avatar = el.dataset.avatar;
+        saveState(); applyPersonalization();
+        modal.querySelectorAll('.avatar-opt').forEach(x=>x.classList.remove('selected'));
+        el.classList.add('selected');
+      };
+    });
+    modal.querySelectorAll('.swatch').forEach(el=>{
+      el.onclick = ()=>{
+        state.settings.theme = el.dataset.theme;
+        saveState(); applyPersonalization();
+        modal.querySelectorAll('.swatch').forEach(x=>x.classList.remove('selected'));
+        el.classList.add('selected');
+      };
+    });
+    modal.querySelectorAll('.textsize-opt').forEach(el=>{
+      el.onclick = ()=>{
+        state.settings.textScale = parseFloat(el.dataset.scale);
+        saveState(); applyTextScale();
+        modal.querySelectorAll('.textsize-opt').forEach(x=>x.classList.remove('selected'));
+        el.classList.add('selected');
+      };
+    });
+    document.getElementById('settings-darkmode').onchange = (e)=>{
+      darkOverride = e.target.checked;
+      applyDarkMode();
+    };
+
+  } else if(key==='pestanas'){
+    const rows = TAB_DEFS.map(t=>
+      '<label class="settings-row"><span>'+t.icon+' '+t.label+'</span><input type="checkbox" data-tabkey="'+t.key+'" '+(state.settings.tabs[t.key]?'checked':'')+'></label>'
+    ).join('');
+    modal.innerHTML = header+
+      '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas alguna pestaña, tu información no se pierde, solamente deja de ser visible.</p>'+
+      '<div class="settings-group">'+rows+'</div>';
+    bg.appendChild(modal); root.appendChild(bg);
+    modal.querySelectorAll('input[data-tabkey]').forEach(inp=>{
+      inp.onchange = ()=>{
+        state.settings.tabs[inp.dataset.tabkey] = inp.checked;
+        saveState(); applyTabVisibility();
+      };
+    });
+
+  } else if(key==='inicio'){
+    modal.innerHTML = header+
+      '<label class="settings-row"><span>🌤️ Mostrar barra de clima</span><input type="checkbox" id="settings-weather" '+(state.settings.weatherEnabled?'checked':'')+'></label>'+
+      '<label class="settings-row"><span>📖 Versículo diario</span><input type="checkbox" id="settings-versiculos" '+(state.settings.versiculosEnabled?'checked':'')+'></label>'+
+      '<div class="settings-subtitle">Ciudad para el clima</div>'+
+      '<div class="frow" style="display:flex;gap:8px;align-items:flex-start;">'+
+        '<input id="settings-city" class="settings-input" placeholder="Ej: Medellín, Cali..." style="flex:1;">'+
+        '<button class="pill-btn yolk" id="settings-city-save" style="white-space:nowrap;">Buscar</button>'+
+      '</div>'+
+      '<p style="font-size:12px;color:var(--ink-soft);margin-top:-4px;">Ciudad actual: <span id="settings-city-current">'+esc((state.settings.weatherLocation&&state.settings.weatherLocation.name)||'Bogotá')+'</span></p>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('settings-weather').onchange = (e)=>{
+      state.settings.weatherEnabled = e.target.checked;
+      saveState(); applyWeatherVisibility();
+    };
+    document.getElementById('settings-versiculos').onchange = (e)=>{
+      state.settings.versiculosEnabled = e.target.checked;
+      saveState(); applyVersiculosVisibility();
+    };
+    document.getElementById('settings-city-save').onclick = async ()=>{
+      const query = document.getElementById('settings-city').value.trim();
+      if(!query){ showToast('Escribe una ciudad', 'error'); return; }
+      const btn = document.getElementById('settings-city-save');
+      btn.disabled = true; btn.textContent = 'Buscando...';
+      try{
+        const found = await buscarCiudad(query);
+        btn.disabled = false; btn.textContent = 'Buscar';
+        if(!found){ showToast('No se encontró esa ciudad', 'error'); return; }
+        state.settings.weatherLocation = found;
+        saveState();
+        document.getElementById('settings-city-current').textContent = found.name;
+        document.getElementById('settings-city').value = '';
+        loadWeather();
+        showToast('Ciudad actualizada', 'ok');
+      }catch(e){
+        btn.disabled = false; btn.textContent = 'Buscar';
+        showToast('No se pudo buscar la ciudad', 'error');
+      }
+    };
+    document.getElementById('settings-city').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('settings-city-save').click(); });
+
+  } else if(key==='voz'){
+    modal.innerHTML = header+
+      '<label class="settings-row"><span>🎤 Dictado por voz</span><input type="checkbox" id="settings-mic" '+(state.settings.micEnabled?'checked':'')+'></label>'+
+      '<label class="settings-row"><span>🤖 Asistente de IA (beta)</span><input type="checkbox" id="settings-ai" '+(state.settings.aiEnabled?'checked':'')+'></label>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('settings-mic').onchange = (e)=>{
+      state.settings.micEnabled = e.target.checked;
+      saveState(); applyMicVisibility();
+    };
+    document.getElementById('settings-ai').onchange = async (e)=>{
+      if(e.target.checked){
+        e.target.disabled = true;
+        const allowed = await checkAIAccess();
+        e.target.disabled = false;
+        if(!allowed){
+          e.target.checked = false;
+          showPaywallModal();
+          return;
+        }
+        state.settings.aiEnabled = true;
+      } else {
+        state.settings.aiEnabled = false;
+      }
+      saveState(); applyAIVisibility();
+    };
+
+  } else if(key==='notificaciones'){
+    modal.innerHTML = header+
+      '<label class="settings-row"><span>🔔 Notificaciones push</span><input type="checkbox" id="settings-push" '+(state.settings.pushEnabled?'checked':'')+'></label>';
+    bg.appendChild(modal); root.appendChild(bg);
+    document.getElementById('settings-push').onchange = async (e)=>{
+      if(e.target.checked){
+        const ok = await enablePush();
+        if(!ok){ e.target.checked = false; return; }
+        state.settings.pushEnabled = true;
+        showToast('Notificaciones activadas', 'ok');
+      } else {
+        await disablePush();
+        state.settings.pushEnabled = false;
+      }
+      saveState();
+    };
+  }
+
+  document.getElementById('settings-back').onclick = renderSettingsMenu;
 }
 document.getElementById('btn-settings').onclick = openSettingsModal;
 
