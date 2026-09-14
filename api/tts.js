@@ -44,9 +44,10 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'tts-1',
-        voice: 'nova',
+        model: 'gpt-4o-mini-tts',
+        voice: 'coral',
         input: textoLimitado,
+        instructions: 'Habla en español latinoamericano neutro, como un hablante nativo colombiano. Acento natural, cálido y cercano, de ninguna manera con acento angloparlante ni de España. Ritmo conversacional, ni muy rápido ni muy lento.',
         response_format: 'mp3'
       })
     });
