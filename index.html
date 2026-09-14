@@ -2858,7 +2858,6 @@ function hablar(texto){
   if(!('speechSynthesis' in window)) return;
   try{
     speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(texto);
     const voces = speechSynthesis.getVoices();
     // Preferimos voces de español latinoamericano, en este orden. Si el teléfono
     // no tiene ninguna de estas instaladas, caemos a cualquier "es-" que no sea
@@ -2871,10 +2870,16 @@ function hablar(texto){
     }
     if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es') && v.lang.toLowerCase()!=='es-es');
     if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
-    if(vozEs) utter.voice = vozEs;
-    utter.lang = vozEs ? vozEs.lang : 'es-ES';
-    utter.onerror = (e)=>{ console.error('Error de síntesis de voz', e); };
-    speechSynthesis.speak(utter);
+    // Pequeña espera después de cancel(): en Chrome de Android, llamar a speak()
+    // justo después de cancel() a veces hace que el navegador "se coma" la voz
+    // nueva sin decir nada — este pequeño respiro evita ese bug conocido.
+    setTimeout(()=>{
+      const utter = new SpeechSynthesisUtterance(texto);
+      if(vozEs) utter.voice = vozEs;
+      utter.lang = vozEs ? vozEs.lang : 'es-ES';
+      utter.onerror = (e)=>{ console.error('Error de síntesis de voz', e); };
+      speechSynthesis.speak(utter);
+    }, 120);
   }catch(err){
     console.error('No se pudo hablar', err);
   }
