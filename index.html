@@ -2811,7 +2811,7 @@ function construirContextoIA(){
       fecha: dateKey(d),
       diaSemana: DAY_NAMES[(d.getDay()+6)%7],
       esHoy: i===0,
-      actividades: items.map(it=>({ nombre:it.texto, hora:it.hora||null, notas:it.notas||'' }))
+      actividades: items.map(it=>({ nombre:it.texto, hora:it.hora?formatearHora12(it.hora):null, notas:it.notas||'' }))
     });
   }
   // Citas o eventos puntuales (no recurrentes) de cualquier fecha futura, aunque
@@ -2821,12 +2821,12 @@ function construirContextoIA(){
     .filter(c=> c.date >= hoyKey)
     .sort((a,b)=> (a.date+a.hora).localeCompare(b.date+b.hora))
     .slice(0, 100)
-    .map(c=>({ nombre:c.nombre, fecha:c.date, hora:c.hora||null, notas:c.notas||'' }));
+    .map(c=>({ nombre:c.nombre, fecha:c.date, hora:c.hora?formatearHora12(c.hora):null, notas:c.notas||'' }));
   const signosRecientes = [...state.signosVitales]
     .sort((a,b)=> (b.fecha+b.hora).localeCompare(a.fecha+a.hora))
     .slice(0, 10)
     .map(r=>({
-      fecha:r.fecha, hora:r.hora,
+      fecha:r.fecha, hora:r.hora?formatearHora12(r.hora):null,
       sistolica:r.sistolica||null, diastolica:r.diastolica||null,
       fc:r.fc||null, glicemia:r.glicemia||null, peso:r.peso||null,
       otros: Object.keys(r.otros||{}).reduce((acc,mid)=>{
@@ -2844,7 +2844,7 @@ function construirContextoIA(){
       return { nombre:p.nombre, diaDelMes:p.dia, frecuencia:p.frecuencia||'mensual', pagado:info.paid, diasParaVencer:info.diffDays };
     }),
     presupuesto: state.presupuesto.categorias.map(c=>({ nombre:c.nombre, presupuestoMensual:c.monto, gastadoEsteMes:totalGastadoCategoria(c.id) })),
-    medicamentos: state.medicamentos.map(m=>({ nombre:m.nombre, dosis:m.dosis, horarios:m.horarios })),
+    medicamentos: state.medicamentos.map(m=>({ nombre:m.nombre, dosis:m.dosis, horarios:(m.horarios||[]).map(formatearHora12) })),
     mercado: {
       enCarritoPendiente: state.mercadoDefault.filter(m=>m.enCarrito && !m.comprado).map(m=>m.nombre),
       enCarritoYaComprado: state.mercadoDefault.filter(m=>m.enCarrito && m.comprado).map(m=>m.nombre),
