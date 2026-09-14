@@ -1652,7 +1652,7 @@ function renderWeek(){
       items.forEach(it=> card.appendChild(renderItemRow(it,key)));
     }
 
-    // un solo botón: el formulario que abre deja elegir si se repite cada semana o es solo este día
+    // un solo botón: el formulario que abre deja elegir si se repite cada semana o es solo ese día
     const addActBtn = document.createElement('button');
     addActBtn.className='pill-btn yolk';
     addActBtn.style.cssText='width:100%;margin-top:9px;';
@@ -2854,8 +2854,14 @@ function construirContextoIA(){
   };
 }
 
+let vozFallidaEnEstaSesion = false; // una vez falla el navegador, no reintenta cada vez — va directo a OpenAI
+let audioOpenAIActual = null;
+
 function hablar(texto){
-  if(!('speechSynthesis' in window)) return;
+  if(vozFallidaEnEstaSesion || !('speechSynthesis' in window)){
+    hablarConOpenAI(texto);
+    return;
+  }
   try{
     speechSynthesis.cancel();
     const voces = speechSynthesis.getVoices();
@@ -2870,6 +2876,21 @@ function hablar(texto){
     }
     if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es') && v.lang.toLowerCase()!=='es-es');
     if(!vozEs) vozEs = voces.find(v=> v.lang && v.lang.toLowerCase().startsWith('es'));
+
+    let yaEmpezoAHablar = false;
+    let yaUsoRespaldo = false;
+
+    // Si en 2.5s no empezó a sonar, asumimos que falló en silencio (pasa en algunos
+    // Android/Chrome) y usamos la voz de OpenAI como respaldo.
+    const timeoutRespaldo = setTimeout(()=>{
+      if(!yaEmpezoAHablar && !yaUsoRespaldo){
+        yaUsoRespaldo = true;
+        vozFallidaEnEstaSesion = true;
+        speechSynthesis.cancel();
+        hablarConOpenAI(texto);
+      }
+    }, 2500);
+
     // Pequeña espera después de cancel(): en Chrome de Android, llamar a speak()
     // justo después de cancel() a veces hace que el navegador "se coma" la voz
     // nueva sin decir nada — este pequeño respiro evita ese bug conocido.
@@ -2877,11 +2898,43 @@ function hablar(texto){
       const utter = new SpeechSynthesisUtterance(texto);
       if(vozEs) utter.voice = vozEs;
       utter.lang = vozEs ? vozEs.lang : 'es-ES';
-      utter.onerror = (e)=>{ console.error('Error de síntesis de voz', e); };
+      utter.onstart = ()=>{ yaEmpezoAHablar = true; clearTimeout(timeoutRespaldo); };
+      utter.onerror = (e)=>{
+        console.error('Error de síntesis de voz', e);
+        clearTimeout(timeoutRespaldo);
+        if(!yaUsoRespaldo){
+          yaUsoRespaldo = true;
+          vozFallidaEnEstaSesion = true;
+          hablarConOpenAI(texto);
+        }
+      };
       speechSynthesis.speak(utter);
     }, 120);
   }catch(err){
     console.error('No se pudo hablar', err);
+    hablarConOpenAI(texto);
+  }
+}
+
+async function hablarConOpenAI(texto){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token = session && session.access_token;
+    if(!token) return;
+
+    const resp = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, texto })
+    });
+    if(!resp.ok) return;
+
+    const blob = await resp.blob();
+    if(audioOpenAIActual){ audioOpenAIActual.pause(); }
+    audioOpenAIActual = new Audio(URL.createObjectURL(blob));
+    audioOpenAIActual.play();
+  }catch(err){
+    console.error('No se pudo reproducir la voz de respaldo (OpenAI)', err);
   }
 }
 
