@@ -654,6 +654,7 @@
 
   <!-- PRESUPUESTO -->
   <div id="tab-presupuesto" class="tabpanel hidden">
+    <button class="pill-btn moss" id="btn-plan-financiero" style="width:100%;margin-bottom:14px;">💡 ¿Quiero un plan financiero?</button>
     <div class="section-title">
       Categorías
       <button class="pill-btn yolk" id="btn-toggle-edit-presupuesto">✏️ Editar</button>
@@ -815,7 +816,7 @@ function blankState(){
     pagos:[],              // { id, nombre, dia } — el usuario agrega los suyos
     pagosStatus:{},       // { pagoId: { 'YYYY-MM': true } }
     mercadoDefault:[],     // { id, nombre, enCarrito, comprado } — el usuario arma su propia lista
-    presupuesto:{ categorias:[], gastos:[] }, // categorias: {id,nombre,monto}; gastos: {id,categoriaId,nombre,monto,fecha}
+    presupuesto:{ categorias:[], gastos:[], ingresoMensual:null }, // categorias: {id,nombre,monto,tipo}; gastos: {id,categoriaId,nombre,monto,fecha}; tipo: 'necesidad'|'deseo'|'objetivo' (para el plan financiero)
     medicamentos:[],      // { id, nombre, dosis, horarios:['08:00','14:00'] }
     medsStatus:{},         // { 'YYYY-MM-DD': { 'medId|hora': true } }
     signosVitales:[],      // { id, fecha:'YYYY-MM-DD', hora:'HH:MM', sistolica, diastolica, fc, glicemia, peso, otros:{metricaId:valor} }
@@ -1372,6 +1373,95 @@ function renderPresupuesto(){
     row.appendChild(del);
     gholder.appendChild(row);
   });
+}
+
+/* ================= PLAN FINANCIERO (regla 50/30/20, educativo — no es asesoría financiera) ================= */
+function metasFinancieras(){
+  return {
+    ahorrar:  { necesidad:50, deseo:30, objetivo:20, label:'Ahorrar' },
+    deudas:   { necesidad:50, deseo:20, objetivo:30, label:'Salir de deudas' },
+    invertir: { necesidad:50, deseo:25, objetivo:25, label:'Invertir' }
+  };
+}
+
+function openPlanFinancieroModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  const metas = metasFinancieras();
+  modal.innerHTML = '<h3>💡 Plan financiero</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow"><label>Ingreso mensual neto</label><input id="pf-ingreso" type="number" min="0" placeholder="Ej: 3000000" value="'+(state.presupuesto.ingresoMensual||'')+'"></div>'+
+      '<div class="frow"><label>¿Cuál es tu meta principal?</label>'+
+        '<select id="pf-meta" class="settings-input">'+
+          Object.keys(metas).map(k=>'<option value="'+k+'">'+metas[k].label+'</option>').join('')+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+    '<div id="pf-clasificacion"></div>'+
+    '<div id="pf-resultado"></div>'+
+    '<p style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;">Esta herramienta ofrece plantillas educativas de organización presupuestal basadas en la regla 50/30/20. No constituye asesoría financiera ni de inversión profesional.</p>'+
+    '<button class="close-btn" id="pf-cerrar">Cerrar</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+
+  function renderClasificacion(){
+    const holder = document.getElementById('pf-clasificacion');
+    const sinClasificar = state.presupuesto.categorias.filter(c=>!c.tipo);
+    if(sinClasificar.length===0){ holder.innerHTML=''; return; }
+    holder.innerHTML = '<div class="settings-subtitle">Clasifica tus categorías para poder compararlas</div>'+
+      sinClasificar.map(c=>
+        '<div class="settings-row" style="cursor:default;"><span>'+esc(c.nombre)+'</span>'+
+        '<select class="settings-input" style="width:auto;" data-catid="'+c.id+'">'+
+          '<option value="">Elegir...</option>'+
+          '<option value="necesidad">Necesidad</option>'+
+          '<option value="deseo">Deseo / estilo de vida</option>'+
+          '<option value="objetivo">Ahorro / objetivo</option>'+
+        '</select></div>'
+      ).join('');
+    holder.querySelectorAll('select[data-catid]').forEach(sel=>{
+      sel.onchange = ()=>{
+        const cat = state.presupuesto.categorias.find(c=>c.id===sel.dataset.catid);
+        if(cat && sel.value){ cat.tipo = sel.value; saveState(); renderClasificacion(); calcular(); }
+      };
+    });
+  }
+
+  function calcular(){
+    const holder = document.getElementById('pf-resultado');
+    const ingreso = parseFloat(document.getElementById('pf-ingreso').value) || 0;
+    if(ingreso<=0){ holder.innerHTML=''; return; }
+    const clasificadas = state.presupuesto.categorias.filter(c=>c.tipo);
+    if(clasificadas.length===0){ holder.innerHTML='<p class="empty-note">Clasifica al menos una categoría arriba para ver la comparación.</p>'; return; }
+    const totales = {necesidad:0, deseo:0, objetivo:0};
+    clasificadas.forEach(c=>{ totales[c.tipo] += totalGastadoCategoria(c.id); });
+    const meta = metas[document.getElementById('pf-meta').value];
+    const pct = (v)=> Math.round((v/ingreso)*100);
+    const filas = [
+      {label:'Necesidades', real:pct(totales.necesidad), objetivo:meta.necesidad},
+      {label:'Deseos / estilo de vida', real:pct(totales.deseo), objetivo:meta.deseo},
+      {label:'Ahorro / objetivos', real:pct(totales.objetivo), objetivo:meta.objetivo}
+    ];
+    holder.innerHTML = '<div class="settings-subtitle">Tu distribución de este mes vs. la meta sugerida</div>'+
+      filas.map(f=>
+        '<div style="margin-bottom:10px;">'+
+          '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;margin-bottom:4px;"><span>'+f.label+'</span><span>'+f.real+'% (meta: '+f.objetivo+'%)</span></div>'+
+          '<div class="budget-bar-track"><div class="budget-bar-fill'+(f.real>f.objetivo?' over':'')+'" style="width:'+Math.min(100,f.real)+'%;"></div></div>'+
+        '</div>'
+      ).join('');
+  }
+
+  renderClasificacion();
+  document.getElementById('pf-ingreso').addEventListener('input', ()=>{
+    const val = parseFloat(document.getElementById('pf-ingreso').value);
+    state.presupuesto.ingresoMensual = isNaN(val) ? null : val;
+    saveState();
+    calcular();
+  });
+  document.getElementById('pf-meta').addEventListener('change', calcular);
+  calcular();
+  document.getElementById('pf-cerrar').onclick = ()=>{ root.innerHTML=''; };
 }
 
 function openCategoriaModal(existing, prefill){
@@ -2700,23 +2790,38 @@ function showPaywallModal(){
 }
 
 let iaUsandoVoz = true; // se pone en false si la persona elige "prefiero escribirlo"
+let utteranceActual = null; // referencia global: evita que Chrome/Android "pierda" el objeto de voz antes de reproducirlo
+
+// Chrome en Android a veces exige que speak() ocurra cerca de una interacción real
+// del usuario. Como hablar() se llama DESPUÉS de esperar la respuesta de la IA
+// (un fetch asíncrono), para entonces ya pasó tiempo desde el clic original y el
+// navegador puede negarse a reproducir. Esta función "despierta" el motor de voz
+// justo en el momento del clic (con un sonido casi inaudible), antes de esperar
+// la respuesta — así el canal de audio queda abierto para cuando sí haya texto real.
+function calentarVoz(){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0.01;
+    speechSynthesis.speak(u);
+  }catch(e){ /* si falla, no pasa nada — hablar() igual reintenta después */ }
+}
 
 function detectarPasosMicrofono(){
   const ua = navigator.userAgent || '';
   const esIOS = /iPhone|iPad|iPod/.test(ua);
   const esAndroid = /Android/.test(ua);
-  const esChrome = /Chrome/.test(ua) && !/Edg|OPR|SamsungBrowser/.test(ua);
-  const esSamsung = /SamsungBrowser/.test(ua);
+  const esSamsungBrowser = /SamsungBrowser/.test(ua);
   if(esIOS){
     return ['Abre Ajustes del iPhone (no la app)','Baja y toca Safari','Busca "Micrófono" y actívalo para este sitio','Vuelve aquí y toca "Ya lo activé, reintentar"'];
   }
-  if(esAndroid && esSamsung){
-    return ['Toca el ícono junto a la barra de direcciones (candado o "i")','Toca "Permisos del sitio"','Cambia Micrófono a "Permitir"','Toca "Ya lo activé, reintentar" abajo'];
+  if(esAndroid && esSamsungBrowser){
+    return ['Toca los tres puntos ⋮ o ≡ arriba a la derecha del navegador','Toca "Configuración"','Toca "Sitios web inteligentes" o "Permisos"','Busca "Micrófono" y permite el sitio','Cierra el navegador por completo y ábrelo de nuevo'];
   }
-  if(esAndroid && esChrome){
-    return ['Toca el candado 🔒 junto a la barra de direcciones, arriba','Toca "Permisos" o "Información del sitio"','Cambia Micrófono a "Permitir"','Toca "Ya lo activé, reintentar" abajo'];
+  if(esAndroid){
+    return ['Toca los tres puntos ⋮ arriba a la derecha de Chrome','Toca "Configuración"','Toca "Configuración de sitios" (o "Permisos del sitio")','Toca "Micrófono"','Busca "aienda.vercel.app" en la lista bloqueada y cámbialo a "Permitir"','Cierra Chrome por completo (no solo la pestaña) y ábrelo de nuevo'];
   }
-  return ['Busca el ícono de candado o "i" junto a la barra de direcciones','Busca "Permisos del sitio"','Activa el Micrófono para este sitio','Toca "Ya lo activé, reintentar" abajo'];
+  return ['Abre el menú de configuración de tu navegador','Busca "Permisos del sitio" o "Configuración de sitios"','Busca "aienda.vercel.app" y activa el Micrófono','Cierra el navegador por completo y ábrelo de nuevo'];
 }
 
 function mostrarErrorPermisoMicrofono(estadoEl, modal){
@@ -2738,6 +2843,7 @@ function mostrarErrorPermisoMicrofono(estadoEl, modal){
 
 function openAIModal(){
   iaUsandoVoz = true;
+  calentarVoz(); // aprovecha este clic real para "despertar" la voz antes de esperar a la IA
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
@@ -2774,6 +2880,7 @@ function openAIModal(){
   document.getElementById('ai-send').onclick = ()=>{
     const texto = document.getElementById('ai-input').value.trim();
     if(!texto){ showToast('Escribe algo primero', 'error'); return; }
+    calentarVoz(); // este clic también es un gesto real del usuario
     procesarTextoIA(texto, root, null);
   };
   document.getElementById('ai-input')?.addEventListener?.('keydown', e=>{ if(e.key==='Enter') document.getElementById('ai-send').click(); });
@@ -2949,12 +3056,15 @@ function hablar(texto){
     // nueva sin decir nada — este pequeño respiro evita ese bug conocido.
     setTimeout(()=>{
       const utter = new SpeechSynthesisUtterance(texto);
+      utteranceActual = utter; // referencia global: evita que se pierda antes de reproducirse
       if(vozEs) utter.voice = vozEs;
       utter.lang = vozEs ? vozEs.lang : 'es-ES';
       utter.onstart = ()=>{ yaEmpezoAHablar = true; clearTimeout(timeoutRespaldo); };
+      utter.onend = ()=>{ utteranceActual = null; };
       utter.onerror = (e)=>{
         console.error('Error de síntesis de voz', e);
         clearTimeout(timeoutRespaldo);
+        utteranceActual = null;
         if(!yaUsoRespaldo){
           yaUsoRespaldo = true;
           vozFallidaEnEstaSesion = true;
@@ -3533,6 +3643,7 @@ document.getElementById('btn-search-toggle').onclick = ()=>{
 document.getElementById('search-input').addEventListener('input', e=> renderSearchResults(e.target.value));
 document.getElementById('search-input').addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarBusqueda(); });
 document.getElementById('btn-add-categoria').onclick = ()=> openCategoriaModal(null);
+document.getElementById('btn-plan-financiero').onclick = openPlanFinancieroModal;
 document.getElementById('btn-add-gasto').onclick = ()=> openGastoModal();
 document.getElementById('btn-toggle-edit-presupuesto').onclick = ()=>{
   editModePresupuesto = !editModePresupuesto;
