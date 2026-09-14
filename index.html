@@ -2683,6 +2683,41 @@ function showPaywallModal(){
 
 let iaUsandoVoz = true; // se pone en false si la persona elige "prefiero escribirlo"
 
+function detectarPasosMicrofono(){
+  const ua = navigator.userAgent || '';
+  const esIOS = /iPhone|iPad|iPod/.test(ua);
+  const esAndroid = /Android/.test(ua);
+  const esChrome = /Chrome/.test(ua) && !/Edg|OPR|SamsungBrowser/.test(ua);
+  const esSamsung = /SamsungBrowser/.test(ua);
+  if(esIOS){
+    return ['Abre Ajustes del iPhone (no la app)','Baja y toca Safari','Busca "Micrófono" y actívalo para este sitio','Vuelve aquí y toca "Ya lo activé, reintentar"'];
+  }
+  if(esAndroid && esSamsung){
+    return ['Toca el ícono junto a la barra de direcciones (candado o "i")','Toca "Permisos del sitio"','Cambia Micrófono a "Permitir"','Toca "Ya lo activé, reintentar" abajo'];
+  }
+  if(esAndroid && esChrome){
+    return ['Toca el candado 🔒 junto a la barra de direcciones, arriba','Toca "Permisos" o "Información del sitio"','Cambia Micrófono a "Permitir"','Toca "Ya lo activé, reintentar" abajo'];
+  }
+  return ['Busca el ícono de candado o "i" junto a la barra de direcciones','Busca "Permisos del sitio"','Activa el Micrófono para este sitio','Toca "Ya lo activé, reintentar" abajo'];
+}
+
+function mostrarErrorPermisoMicrofono(estadoEl, modal){
+  const pasos = detectarPasosMicrofono();
+  estadoEl.innerHTML = '<div style="text-align:left;">'+
+    '<p style="font-weight:800;margin:0 0 8px;">🎤 Necesito permiso para usar el micrófono</p>'+
+    '<ol style="margin:0 0 4px 18px;padding:0;font-size:13.5px;line-height:1.6;">'+ pasos.map(p=>'<li>'+esc(p)+'</li>').join('') +'</ol>'+
+    '</div>';
+  const yaExiste = modal.querySelector('#mic-retry-btn');
+  if(yaExiste) yaExiste.remove();
+  const retryBtn = document.createElement('button');
+  retryBtn.id = 'mic-retry-btn';
+  retryBtn.className='pill-btn yolk';
+  retryBtn.style.cssText='width:100%;margin-top:2px;';
+  retryBtn.textContent='Ya lo activé, reintentar';
+  retryBtn.onclick = ()=>{ modal.parentElement.innerHTML=''; openAIModal(); };
+  estadoEl.after(retryBtn);
+}
+
 function openAIModal(){
   iaUsandoVoz = true;
   const root = document.getElementById('modal-root');
@@ -2747,7 +2782,7 @@ function openAIModal(){
   };
   recActual.onerror = (e)=>{
     if(e.error==='no-speech'){ estadoEl.textContent = 'No escuché nada. Toca el fondo para cerrar, o escribe.'; }
-    else if(e.error==='not-allowed'){ estadoEl.textContent = 'No tengo permiso para usar el micrófono.'; }
+    else if(e.error==='not-allowed'){ mostrarErrorPermisoMicrofono(estadoEl, modal); }
     else { estadoEl.textContent = 'No pude escuchar bien. Intenta de nuevo o escribe.'; }
   };
   try{ recActual.start(); }catch(e){ document.getElementById('ai-modo-texto-btn').click(); }
