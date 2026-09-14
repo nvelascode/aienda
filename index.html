@@ -599,12 +599,16 @@
   <!-- ACTIVIDADES -->
   <div id="tab-actividades" class="tabpanel hidden">
     <div class="weeknav">
-      <button id="week-prev">‹</button>
-      <div class="label" id="week-label"></div>
-      <button id="week-next">›</button>
+      <span id="weeknav-semana-controls" style="display:flex;align-items:center;flex:1;gap:8px;">
+        <button id="week-prev">‹</button>
+        <div class="label" id="week-label"></div>
+        <button id="week-next">›</button>
+      </span>
       <button id="btn-jump-date" title="Ir a un mes">📅</button>
+      <button id="btn-toggle-vista-mes" title="Ver mes completo">🗓️</button>
     </div>
     <div id="week-days"></div>
+    <div id="month-view" class="hidden"></div>
   </div>
 
   <!-- CUMPLEAÑOS -->
@@ -825,6 +829,7 @@ function blankState(){
     signosMetricas:[],      // { id, nombre, unidad } — métricas personalizadas adicionales (ej: TSH, Colesterol)
     settings:{
       tabs:{ actividades:true, cumple:true, pagos:true, mercado:true, presupuesto:true, medicamentos:false, signos:false }, // qué pestañas se muestran (el contenido nunca se borra al desactivar)
+      tabOrder:['actividades','cumple','pagos','mercado','presupuesto','medicamentos','signos'], // orden de las pestañas en la barra inferior (Inicio siempre queda fija de primera)
       weatherEnabled:false,
       micEnabled:false, // dictado por voz — apagado por defecto, se activa desde Configuración
       pushEnabled:false, // notificaciones push — apagadas por defecto, se activan desde Configuración
@@ -1076,9 +1081,10 @@ async function onLoggedIn(user){
   currentUser = user;
   state = blankState();
   await loadState();
+  if(!state.settings.tabOrder) state.settings.tabOrder = TAB_DEFS.map(t=>t.key); // cuentas antiguas que no tenían este campo
   hideAuthScreen();
   applyDarkMode(); applyPersonalization(); applyTextScale();
-  applyTabVisibility(); applyWeatherVisibility(); applyMicVisibility(); applyAIVisibility(); applyVersiculosVisibility();
+  applyTabVisibility(); applyTabOrder(); applyWeatherVisibility(); applyMicVisibility(); applyAIVisibility(); applyVersiculosVisibility();
   renderAll(); renderSvOtrosFields(); renderMetricasChips();
   loadWeather();
   refreshAccountInfo();
@@ -2427,12 +2433,17 @@ function cerrarBusqueda(){
 }
 
 /* ================= MASTER RENDER ================= */
+function renderActividadesTab(){
+  if(actividadesModoMes) renderMonthView();
+  else renderWeek();
+}
+
 function renderAll(){
   renderGreeting();
   renderAlerts();
   renderHomeThisWeek();
   renderHomeNextWeek();
-  renderWeek();
+  renderActividadesTab();
   renderBdayList();
   renderPagos();
   renderMercadoCart();
@@ -2819,6 +2830,15 @@ function applyTabVisibility(){
   }
   const btnGastoHome = document.getElementById('btn-add-gasto-home');
   if(btnGastoHome) btnGastoHome.classList.toggle('hidden', !state.settings.tabs.presupuesto);
+}
+function applyTabOrder(){
+  const tabbar = document.querySelector('.tabbar');
+  if(!tabbar) return;
+  const homeBtn = tabbar.querySelector('.tab-btn[data-tab="home"]');
+  const order = state.settings.tabOrder || TAB_DEFS.map(t=>t.key);
+  const restBtns = order.map(key=> tabbar.querySelector('.tab-btn[data-tab="'+key+'"]')).filter(Boolean);
+  if(homeBtn) tabbar.appendChild(homeBtn); // lo saca y lo vuelve a poner de primero
+  restBtns.forEach(b=> tabbar.appendChild(b));
 }
 function applyWeatherVisibility(){
   document.getElementById('weather-widget').classList.toggle('hidden', !state.settings.weatherEnabled);
@@ -3428,19 +3448,43 @@ function renderSettingsCategory(key){
     };
 
   } else if(key==='pestanas'){
-    const rows = TAB_DEFS.map(t=>
-      '<label class="settings-row"><span>'+t.icon+' '+t.label+'</span><input type="checkbox" data-tabkey="'+t.key+'" '+(state.settings.tabs[t.key]?'checked':'')+'></label>'
-    ).join('');
+    function renderPestanasRows(){
+      return state.settings.tabOrder.map((tkey,idx)=>{
+        const t = TAB_DEFS.find(td=>td.key===tkey);
+        if(!t) return '';
+        return '<div class="settings-row"><span>'+t.icon+' '+t.label+'</span>'+
+          '<div style="display:flex;align-items:center;gap:6px;">'+
+            '<button type="button" class="tp-arrow" data-move="up" data-key="'+t.key+'" style="width:28px;"'+(idx===0?' disabled':'')+'>▲</button>'+
+            '<button type="button" class="tp-arrow" data-move="down" data-key="'+t.key+'" style="width:28px;"'+(idx===state.settings.tabOrder.length-1?' disabled':'')+'>▼</button>'+
+            '<input type="checkbox" data-tabkey="'+t.key+'" '+(state.settings.tabs[t.key]?'checked':'')+'>'+
+          '</div></div>';
+      }).join('');
+    }
     modal.innerHTML = header+
-      '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas alguna pestaña, tu información no se pierde, solamente deja de ser visible.</p>'+
-      '<div class="settings-group">'+rows+'</div>';
+      '<p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Si desactivas alguna pestaña, tu información no se pierde, solamente deja de ser visible. Usa las flechas para cambiar el orden en que aparecen.</p>'+
+      '<div class="settings-group" id="pestanas-rows">'+renderPestanasRows()+'</div>';
     bg.appendChild(modal); root.appendChild(bg);
-    modal.querySelectorAll('input[data-tabkey]').forEach(inp=>{
-      inp.onchange = ()=>{
-        state.settings.tabs[inp.dataset.tabkey] = inp.checked;
-        saveState(); applyTabVisibility();
-      };
-    });
+    function wirePestanasRows(){
+      modal.querySelectorAll('input[data-tabkey]').forEach(inp=>{
+        inp.onchange = ()=>{
+          state.settings.tabs[inp.dataset.tabkey] = inp.checked;
+          saveState(); applyTabVisibility();
+        };
+      });
+      modal.querySelectorAll('button[data-move]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const order = state.settings.tabOrder;
+          const i = order.indexOf(btn.dataset.key);
+          const j = btn.dataset.move==='up' ? i-1 : i+1;
+          if(i<0 || j<0 || j>=order.length) return;
+          [order[i],order[j]] = [order[j],order[i]];
+          saveState(); applyTabOrder();
+          document.getElementById('pestanas-rows').innerHTML = renderPestanasRows();
+          wirePestanasRows();
+        };
+      });
+    }
+    wirePestanasRows();
 
   } else if(key==='inicio'){
     modal.innerHTML = header+
@@ -3533,6 +3577,17 @@ document.getElementById('btn-settings').onclick = openSettingsModal;
 
 document.getElementById('week-prev').onclick = ()=>{ activitiesWeekStart.setDate(activitiesWeekStart.getDate()-7); renderWeek(); };
 document.getElementById('week-next').onclick = ()=>{ activitiesWeekStart.setDate(activitiesWeekStart.getDate()+7); renderWeek(); };
+document.getElementById('btn-toggle-vista-mes').onclick = ()=>{
+  actividadesModoMes = !actividadesModoMes;
+  document.getElementById('weeknav-semana-controls').classList.toggle('hidden', actividadesModoMes);
+  document.getElementById('week-days').classList.toggle('hidden', actividadesModoMes);
+  document.getElementById('month-view').classList.toggle('hidden', !actividadesModoMes);
+  document.getElementById('btn-jump-date').classList.toggle('hidden', actividadesModoMes);
+  document.getElementById('btn-toggle-vista-mes').textContent = actividadesModoMes ? '📆' : '🗓️';
+  document.getElementById('btn-toggle-vista-mes').title = actividadesModoMes ? 'Ver semana' : 'Ver mes completo';
+  if(actividadesModoMes) mesViewDate = new Date(activitiesWeekStart);
+  renderActividadesTab();
+};
 document.getElementById('btn-jump-date').onclick = ()=> openJumpDateModal();
 
 /* ================= FESTIVOS DE COLOMBIA (calculados, no hay que actualizarlos a mano) ================= */
@@ -3603,6 +3658,88 @@ function festivosColombiaMap(year){
 
 /* ================= CALENDARIO VISUAL (domingo a sábado, festivos y marcas de compromisos) ================= */
 let calViewDate = new Date();
+
+let actividadesModoMes = false;
+let mesViewDate = new Date();
+let mesDiaSeleccionado = null;
+
+function renderMonthView(){
+  const holder = document.getElementById('month-view');
+  if(!holder) return;
+  const year = mesViewDate.getFullYear();
+  const month = mesViewDate.getMonth();
+  const startOffset = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const festivos = festivosColombiaMap(year);
+  const hoy = new Date();
+  const weekdayLabels = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+  let cellsHtml = '';
+  for(let i=0;i<startOffset;i++){ cellsHtml += '<div class="cal-day outside"></div>'; }
+  for(let dia=1; dia<=daysInMonth; dia++){
+    const d = new Date(year, month, dia);
+    const key = dateKey(d);
+    const isToday = sameDate(d, hoy);
+    const isSelected = mesDiaSeleccionado===key;
+    const holidayName = festivos[key];
+    const hasItems = buildDayItems(d).length>0 || bdaysOn(d).length>0;
+    let cls = 'cal-day';
+    if(isToday) cls += ' today';
+    if(holidayName) cls += ' holiday';
+    cellsHtml += '<div class="'+cls+'" data-date="'+key+'" style="'+(isSelected?'box-shadow:0 0 0 2px var(--moss) inset;':'')+'">'+dia+
+      (hasItems?'<span class="cal-dot"></span>':'')+
+      '</div>';
+  }
+
+  holder.innerHTML = '<div class="cal-modal-head">'+
+      '<button class="cal-nav-btn" id="mes-prev">‹</button>'+
+      '<h3 style="margin:0;">'+MONTH_NAMES[month]+' '+year+'</h3>'+
+      '<button class="cal-nav-btn" id="mes-next">›</button>'+
+    '</div>'+
+    '<div class="cal-weekdays">'+weekdayLabels.map(w=>'<div>'+w+'</div>').join('')+'</div>'+
+    '<div class="cal-grid" style="margin-bottom:14px;">'+cellsHtml+'</div>'+
+    '<div id="mes-dia-detalle"></div>';
+
+  document.getElementById('mes-prev').onclick = ()=>{ mesViewDate.setMonth(mesViewDate.getMonth()-1); renderMonthView(); };
+  document.getElementById('mes-next').onclick = ()=>{ mesViewDate.setMonth(mesViewDate.getMonth()+1); renderMonthView(); };
+  holder.querySelectorAll('.cal-day[data-date]').forEach(el=>{
+    el.onclick = ()=>{ mesDiaSeleccionado = el.dataset.date; renderMonthView(); };
+  });
+
+  renderMesDiaDetalle();
+}
+
+function renderMesDiaDetalle(){
+  const holder = document.getElementById('mes-dia-detalle');
+  if(!holder) return;
+  if(!mesDiaSeleccionado){
+    holder.innerHTML = '<p class="empty-note" style="text-align:center;">Toca un día para ver sus actividades.</p>';
+    return;
+  }
+  const key = mesDiaSeleccionado;
+  const d = new Date(key+'T00:00:00');
+  const dname = DAY_NAMES[(d.getDay()+6)%7];
+  const card = document.createElement('div');
+  card.className = 'day-card is-today';
+  const head = document.createElement('div');
+  head.className='day-head';
+  head.innerHTML = '<span class="dname">'+dname+'</span><span class="ddate">'+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</span>';
+  card.appendChild(head);
+  bdaysOn(d).forEach(b=>{
+    const tag=document.createElement('div'); tag.className='tag-cumple'; tag.textContent='🎂 Cumpleaños de '+b.nombre; card.appendChild(tag);
+  });
+  const items = buildDayItems(d);
+  if(items.length===0 && bdaysOn(d).length===0){
+    const p=document.createElement('div'); p.className='empty-note'; p.textContent='Sin actividades. Toca + para agregar.'; card.appendChild(p);
+  } else {
+    items.forEach(it=> card.appendChild(renderItemRow(it,key)));
+  }
+  const addBtn = document.createElement('button');
+  addBtn.className='pill-btn yolk'; addBtn.style.cssText='width:100%;margin-top:9px;'; addBtn.textContent='+ Agregar actividad';
+  addBtn.onclick = ()=> openActivityModal(key, null, null);
+  card.appendChild(addBtn);
+  holder.innerHTML=''; holder.appendChild(card);
+}
 
 function openJumpDateModal(){
   calViewDate = new Date(activitiesWeekStart);
