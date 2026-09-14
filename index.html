@@ -654,7 +654,8 @@
 
   <!-- PRESUPUESTO -->
   <div id="tab-presupuesto" class="tabpanel hidden">
-    <button class="pill-btn moss" id="btn-plan-financiero" style="width:100%;margin-bottom:14px;">💡 ¿Quiero un plan financiero?</button>
+    <button class="pill-btn moss" id="btn-plan-financiero" style="width:100%;margin-bottom:10px;">💡 ¿Quiero un plan financiero?</button>
+    <div id="presupuesto-resumen-financiero" style="margin-bottom:14px;"></div>
     <div class="section-title">
       Categorías
       <button class="pill-btn yolk" id="btn-toggle-edit-presupuesto">✏️ Editar</button>
@@ -816,7 +817,7 @@ function blankState(){
     pagos:[],              // { id, nombre, dia } — el usuario agrega los suyos
     pagosStatus:{},       // { pagoId: { 'YYYY-MM': true } }
     mercadoDefault:[],     // { id, nombre, enCarrito, comprado } — el usuario arma su propia lista
-    presupuesto:{ categorias:[], gastos:[], ingresoMensual:null }, // categorias: {id,nombre,monto,tipo}; gastos: {id,categoriaId,nombre,monto,fecha}; tipo: 'necesidad'|'deseo'|'objetivo' (para el plan financiero)
+    presupuesto:{ categorias:[], gastos:[], ingresoMensual:null, metaFinanciera:'ahorrar' }, // categorias: {id,nombre,monto,tipo}; gastos: {id,categoriaId,nombre,monto,fecha}; tipo: 'necesidad'|'deseo'|'objetivo' (para el plan financiero)
     medicamentos:[],      // { id, nombre, dosis, horarios:['08:00','14:00'] }
     medsStatus:{},         // { 'YYYY-MM-DD': { 'medId|hora': true } }
     signosVitales:[],      // { id, fecha:'YYYY-MM-DD', hora:'HH:MM', sistolica, diastolica, fc, glicemia, peso, otros:{metricaId:valor} }
@@ -1295,6 +1296,7 @@ function totalGastadoCategoria(catId){
 }
 
 function renderPresupuesto(){
+  renderResumenFinanciero();
   const holder = document.getElementById('presupuesto-categorias');
   if(!holder) return;
   holder.innerHTML='';
@@ -1375,6 +1377,43 @@ function renderPresupuesto(){
   });
 }
 
+/* ================= RESUMEN FINANCIERO AMBIENTAL (franja siempre visible, sin abrir modal) ================= */
+function renderResumenFinanciero(){
+  const holder = document.getElementById('presupuesto-resumen-financiero');
+  if(!holder) return;
+  const ingreso = state.presupuesto.ingresoMensual;
+  if(!ingreso || ingreso<=0){ holder.innerHTML=''; return; }
+  const clasificadas = state.presupuesto.categorias.filter(c=>c.tipo);
+  if(clasificadas.length===0){ holder.innerHTML=''; return; }
+  const totales = {necesidad:0, deseo:0, objetivo:0};
+  clasificadas.forEach(c=>{ totales[c.tipo] += totalGastadoCategoria(c.id); });
+  const meta = metasFinancieras()[state.presupuesto.metaFinanciera || 'ahorrar'];
+  const pct = (v)=> Math.round((v/ingreso)*100);
+  const filas = [
+    {label:'Necesidades', real:pct(totales.necesidad)},
+    {label:'Deseos', real:pct(totales.deseo)},
+    {label:'Ahorro', real:pct(totales.objetivo)}
+  ];
+  holder.innerHTML = '<div class="day-card" style="padding:12px 14px;">'+
+    '<div style="font-size:11.5px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">Este mes vs. meta '+esc(meta.label)+'</div>'+
+    '<div style="display:flex;gap:10px;">'+
+      filas.map(f=> '<div style="flex:1;text-align:center;"><div style="font-family:\'Fredoka\',sans-serif;font-size:18px;font-weight:600;">'+f.real+'%</div><div style="font-size:11px;color:var(--ink-soft);font-weight:700;">'+f.label+'</div></div>').join('')+
+    '</div></div>';
+}
+
+// Sugiere una clasificación (necesidad/deseo/objetivo) según palabras clave comunes en el nombre
+// de la categoría. Es solo una sugerencia editable — nunca se aplica sola sin que el usuario confirme.
+function sugerirTipoCategoria(nombre){
+  const n = normalizarBusqueda(nombre);
+  const necesidad = ['arriendo','renta','servicio','agua','luz','energia','gas','internet','celular','telefono','seguro','salud','eps','transporte','gasolina','colegio','universidad','educacion','mercado','supermercado','deuda','credito','prestamo','cuota'];
+  const deseo = ['entretenimiento','ocio','salida','restaurante','comida afuera','domicilio','ropa','compra','turismo','viaje','streaming','netflix','cine','hobbie','pasatiempo','belleza','gimnasio'];
+  const objetivo = ['ahorro','inversion','fondo','emergencia'];
+  if(necesidad.some(p=> n.includes(p))) return 'necesidad';
+  if(deseo.some(p=> n.includes(p))) return 'deseo';
+  if(objetivo.some(p=> n.includes(p))) return 'objetivo';
+  return null;
+}
+
 /* ================= PLAN FINANCIERO (regla 50/30/20, educativo — no es asesoría financiera) ================= */
 function metasFinancieras(){
   return {
@@ -1388,7 +1427,7 @@ function openPlanFinancieroModal(){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
   const bg = document.createElement('div'); bg.className='modal-bg';
-  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  bg.onclick = (e)=>{ if(e.target===bg){ root.innerHTML=''; renderResumenFinanciero(); } };
   const modal = document.createElement('div'); modal.className='modal';
   const metas = metasFinancieras();
   modal.innerHTML = '<h3>💡 Plan financiero</h3>'+
@@ -1396,7 +1435,7 @@ function openPlanFinancieroModal(){
       '<div class="frow"><label>Ingreso mensual neto</label><input id="pf-ingreso" type="number" min="0" placeholder="Ej: 3000000" value="'+(state.presupuesto.ingresoMensual||'')+'"></div>'+
       '<div class="frow"><label>¿Cuál es tu meta principal?</label>'+
         '<select id="pf-meta" class="settings-input">'+
-          Object.keys(metas).map(k=>'<option value="'+k+'">'+metas[k].label+'</option>').join('')+
+          Object.keys(metas).map(k=>'<option value="'+k+'"'+(state.presupuesto.metaFinanciera===k?' selected':'')+'>'+metas[k].label+'</option>').join('')+
         '</select>'+
       '</div>'+
     '</div>'+
@@ -1410,22 +1449,33 @@ function openPlanFinancieroModal(){
     const holder = document.getElementById('pf-clasificacion');
     const sinClasificar = state.presupuesto.categorias.filter(c=>!c.tipo);
     if(sinClasificar.length===0){ holder.innerHTML=''; return; }
+    const conSugerencia = sinClasificar.filter(c=> sugerirTipoCategoria(c.nombre));
+    const etiquetas = {necesidad:'Necesidad', deseo:'Deseo / estilo de vida', objetivo:'Ahorro / objetivo'};
     holder.innerHTML = '<div class="settings-subtitle">Clasifica tus categorías para poder compararlas</div>'+
-      sinClasificar.map(c=>
-        '<div class="settings-row" style="cursor:default;"><span>'+esc(c.nombre)+'</span>'+
+      (conSugerencia.length>0 ? '<button class="link-btn" id="pf-usar-sugeridas" style="padding:0;margin-bottom:8px;">✓ Usar las sugeridas ('+conSugerencia.length+')</button>' : '')+
+      sinClasificar.map(c=>{
+        const sugerida = sugerirTipoCategoria(c.nombre);
+        return '<div class="settings-row" style="cursor:default;"><span>'+esc(c.nombre)+(sugerida?' <span style="color:var(--ink-soft);font-weight:600;font-size:11.5px;">(sugerido: '+etiquetas[sugerida]+')</span>':'')+'</span>'+
         '<select class="settings-input" style="width:auto;" data-catid="'+c.id+'">'+
           '<option value="">Elegir...</option>'+
-          '<option value="necesidad">Necesidad</option>'+
-          '<option value="deseo">Deseo / estilo de vida</option>'+
-          '<option value="objetivo">Ahorro / objetivo</option>'+
-        '</select></div>'
-      ).join('');
+          '<option value="necesidad"'+(sugerida==='necesidad'?' selected':'')+'>Necesidad</option>'+
+          '<option value="deseo"'+(sugerida==='deseo'?' selected':'')+'>Deseo / estilo de vida</option>'+
+          '<option value="objetivo"'+(sugerida==='objetivo'?' selected':'')+'>Ahorro / objetivo</option>'+
+        '</select></div>';
+      }).join('');
     holder.querySelectorAll('select[data-catid]').forEach(sel=>{
       sel.onchange = ()=>{
         const cat = state.presupuesto.categorias.find(c=>c.id===sel.dataset.catid);
         if(cat && sel.value){ cat.tipo = sel.value; saveState(); renderClasificacion(); calcular(); }
       };
     });
+    const btnSugeridas = document.getElementById('pf-usar-sugeridas');
+    if(btnSugeridas){
+      btnSugeridas.onclick = ()=>{
+        conSugerencia.forEach(c=>{ c.tipo = sugerirTipoCategoria(c.nombre); });
+        saveState(); renderClasificacion(); calcular();
+      };
+    }
   }
 
   function calcular(){
@@ -1459,9 +1509,13 @@ function openPlanFinancieroModal(){
     saveState();
     calcular();
   });
-  document.getElementById('pf-meta').addEventListener('change', calcular);
+  document.getElementById('pf-meta').addEventListener('change', ()=>{
+    state.presupuesto.metaFinanciera = document.getElementById('pf-meta').value;
+    saveState();
+    calcular();
+  });
   calcular();
-  document.getElementById('pf-cerrar').onclick = ()=>{ root.innerHTML=''; };
+  document.getElementById('pf-cerrar').onclick = ()=>{ root.innerHTML=''; renderResumenFinanciero(); };
 }
 
 function openCategoriaModal(existing, prefill){
@@ -1970,7 +2024,27 @@ function renderPagos(){
     btn.textContent = info.paid? '✓ Pagado' : 'Marcar pagado';
     btn.onclick = ()=>{
       if(!state.pagosStatus[p.id]) state.pagosStatus[p.id]={};
-      state.pagosStatus[p.id][info.key] = !info.paid;
+      const yaPagado = !info.paid; // el nuevo estado, después de tocar el botón
+      state.pagosStatus[p.id][info.key] = yaPagado;
+      if(p.categoriaId && p.monto){
+        if(yaPagado){
+          // solo crea el gasto si no existe ya uno para este pago+mes (evita duplicados si se marca varias veces)
+          const yaExiste = state.presupuesto.gastos.some(g=> g.origenPagoId===p.id && g.origenPagoKey===info.key);
+          if(!yaExiste){
+            state.presupuesto.gastos.push({
+              id:uid(), nombre:p.nombre, monto:p.monto, categoriaId:p.categoriaId,
+              fecha:dateKey(info.due), origenPagoId:p.id, origenPagoKey:info.key
+            });
+          }
+        } else {
+          // al desmarcar, se quita el gasto que se había creado automáticamente
+          state.presupuesto.gastos = state.presupuesto.gastos.filter(g=> !(g.origenPagoId===p.id && g.origenPagoKey===info.key));
+        }
+      } else if(yaPagado && !state.settings.tipVinculoPagosVisto){
+        // aviso único (no repetitivo) recordando que existe la opción de vincular con Presupuesto
+        state.settings.tipVinculoPagosVisto = true;
+        showToast('💡 Tip: puedes vincular este pago a Presupuesto editándolo', 'ok');
+      }
       saveState(); renderAll();
     };
     card.querySelector('.pago-bottom').appendChild(btn);
@@ -1986,6 +2060,7 @@ function openPagoModal(existing, prefill){
   const modal = document.createElement('div'); modal.className='modal';
   const base = existing || prefill || {};
   const esBimestral = base.frecuencia==='bimestral';
+  const cats = state.presupuesto.categorias;
   modal.innerHTML = '<h3>'+(existing?'Editar pago':'Nuevo pago')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow"><label>Nombre del pago</label><input id="pf-nombre" placeholder="Ej: Seguro carro" value="'+(base.nombre?esc(base.nombre):'')+'"></div>'+
@@ -2002,6 +2077,14 @@ function openPagoModal(existing, prefill){
           MONTH_NAMES.map((mn,i)=>'<option value="'+i+'"'+(base.mesInicio===i?' selected':'')+'>'+mn+'</option>').join('')+
         '</select>'+
       '</div>'+
+      '<div class="frow"><label>Monto (opcional)</label><input id="pf-monto" type="number" min="0" placeholder="Ej: 180000" value="'+(base.monto||'')+'"></div>'+
+      '<div class="frow"><label>Categoría de presupuesto (opcional)</label>'+
+        '<select id="pf-categoria" class="settings-input">'+
+          '<option value="">Sin vincular</option>'+
+          cats.map(c=>'<option value="'+c.id+'"'+(base.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
+        '</select>'+
+      '</div>'+
+      '<p style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin:0;">Vincula solo pagos que sean 100% de una sola categoría (arriendo, Netflix, seguro...). Si el pago mezcla varias cosas — como una tarjeta de crédito — déjalo "Sin vincular" y sigue registrando esas compras por separado en Gastos, o contarías esa plata dos veces.</p>'+
     '</div>'+
     '<button class="close-btn" id="pf-save">Guardar pago</button>';
   bg.appendChild(modal); root.appendChild(bg);
@@ -2015,12 +2098,16 @@ function openPagoModal(existing, prefill){
     const dia = parseInt(document.getElementById('pf-dia').value,10);
     const frecuencia = document.getElementById('pf-frecuencia').value;
     const mesInicio = parseInt(document.getElementById('pf-mesinicio').value,10);
+    const montoVal = parseFloat(document.getElementById('pf-monto').value);
+    const monto = isNaN(montoVal) ? null : montoVal;
+    const categoriaId = document.getElementById('pf-categoria').value || null;
     if(!nombre || !dia || dia<1 || dia>31) return;
     if(existing){
       existing.nombre = nombre; existing.dia = dia; existing.frecuencia = frecuencia;
+      existing.monto = monto; existing.categoriaId = categoriaId;
       if(frecuencia==='bimestral') existing.mesInicio = mesInicio; else delete existing.mesInicio;
     } else {
-      const nuevo = {id:uid(), nombre, dia, frecuencia};
+      const nuevo = {id:uid(), nombre, dia, frecuencia, monto, categoriaId};
       if(frecuencia==='bimestral') nuevo.mesInicio = mesInicio;
       state.pagos.push(nuevo);
     }
