@@ -1500,7 +1500,7 @@ function renderAlerts(){
     const pendientes = buildTodayMedItems().filter(it=> it.hora<=nowStr && !statusMap[it.statusKey]);
     if(pendientes.length){
       hasMedAlert=true;
-      const names = pendientes.map(it=> it.nombre+' ('+it.hora+')').join(', ');
+      const names = pendientes.map(it=> it.nombre+' ('+formatearHora12(it.hora)+')').join(', ');
       const div=document.createElement('div');
       div.className='alert med';
       div.innerHTML='<span class="ic">💊</span><span>Medicamentos pendientes: '+esc(names)+'</span>';
@@ -1561,7 +1561,7 @@ function renderItemRow(it, dayKey){
   const mid = document.createElement('div');
   mid.style.flex='1';
   let html = '<div class="item-text">'+esc(it.texto)+'</div>';
-  if(it.hora) html += '<div class="item-meta">🕒 '+esc(it.hora)+'</div>';
+  if(it.hora) html += '<div class="item-meta">🕒 '+esc(formatearHora12(it.hora))+'</div>';
   if(it.notas) html += '<div class="item-notes">'+esc(it.notas)+'</div>';
   mid.innerHTML = html;
   row.appendChild(mid);
@@ -1973,7 +1973,7 @@ function renderMedsToday(){
     };
     row.appendChild(chk);
     const mid=document.createElement('div'); mid.style.flex='1';
-    mid.innerHTML = '<div class="item-text">'+esc(it.nombre)+(it.dosis?' — '+esc(it.dosis):'')+'</div><div class="item-meta">🕒 '+esc(it.hora)+'</div>';
+    mid.innerHTML = '<div class="item-text">'+esc(it.nombre)+(it.dosis?' — '+esc(it.dosis):'')+'</div><div class="item-meta">🕒 '+esc(formatearHora12(it.hora))+'</div>';
     row.appendChild(mid);
     holder.appendChild(row);
   });
@@ -1991,7 +1991,7 @@ function renderMedsList(){
     const card=document.createElement('div');
     card.className='pago-card';
     card.innerHTML = '<div class="pago-top"><div><div class="pago-name">'+esc(m.nombre)+'</div>'+
-      '<div class="pago-day">'+(m.dosis?esc(m.dosis)+' · ':'')+'Horarios: '+(m.horarios||[]).join(', ')+'</div></div></div>';
+      '<div class="pago-day">'+(m.dosis?esc(m.dosis)+' · ':'')+'Horarios: '+(m.horarios||[]).map(formatearHora12).join(', ')+'</div></div></div>';
     const actions=document.createElement('div');
     actions.style.display='flex'; actions.style.gap='8px'; actions.style.marginTop='4px';
     const editBtn=document.createElement('button');
@@ -2013,6 +2013,13 @@ function renderMedsList(){
   });
 }
 
+function formatearHora12(hhmm){
+  const partes = hhmm.split(':');
+  const h = parseInt(partes[0],10), m = partes[1];
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+m+' '+(h<12?'AM':'PM');
+}
+
 function openMedModal(existing, prefill){
   const root = document.getElementById('modal-root');
   root.innerHTML = '';
@@ -2020,6 +2027,7 @@ function openMedModal(existing, prefill){
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
   const base = existing || prefill || {};
+  let horariosActuales = (base.horarios||[]).slice();
   modal.innerHTML = '<h3>'+(existing?'Editar medicamento':'Nuevo medicamento')+'</h3>'+
     '<div class="form-card" style="border-style:solid;">'+
       '<div class="frow" style="display:flex;gap:8px;align-items:flex-end;">'+
@@ -2027,16 +2035,52 @@ function openMedModal(existing, prefill){
         '<span id="mf-mic-holder"></span>'+
       '</div>'+
       '<div class="frow"><label>Dosis (opcional)</label><input id="mf-dosis" placeholder="Ej: 50mg, 1 tableta" value="'+(base.dosis?esc(base.dosis):'')+'"></div>'+
-      '<div class="frow"><label>Horarios (separados por coma)</label><input id="mf-horarios" placeholder="Ej: 08:00, 14:00, 20:00" value="'+(esc((base.horarios||[]).join(', ')))+'"></div>'+
+      '<label style="font-size:12px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:6px;">Horarios</label>'+
+      '<div class="time-picker" id="mf-hora-picker"></div>'+
+      '<button type="button" class="link-btn" id="mf-add-horario" style="padding:6px 2px 10px;">+ Agregar horario</button>'+
+      '<div id="mf-horarios-chips"></div>'+
     '</div>'+
     '<button class="close-btn" id="mf-save">Guardar medicamento</button>';
   bg.appendChild(modal); root.appendChild(bg);
   document.getElementById('mf-mic-holder').appendChild(makeMicButton(document.getElementById('mf-nombre')));
+
+  const mfPicker = createTimePicker(document.getElementById('mf-hora-picker'), '08:00');
+
+  function renderHorariosChips(){
+    const holder = document.getElementById('mf-horarios-chips');
+    if(horariosActuales.length===0){
+      holder.innerHTML = '<div class="empty-note" style="padding:2px 0;">Aún no has agregado ningún horario.</div>';
+      return;
+    }
+    const ordenados = [...horariosActuales].sort();
+    holder.innerHTML = ordenados.map(h=>
+      '<span class="metrica-chip">'+formatearHora12(h)+' <button data-hora="'+h+'">✕</button></span>'
+    ).join('');
+    holder.querySelectorAll('button[data-hora]').forEach(btn=>{
+      btn.onclick = ()=>{
+        horariosActuales = horariosActuales.filter(x=>x!==btn.dataset.hora);
+        renderHorariosChips();
+      };
+    });
+  }
+  renderHorariosChips();
+
+  document.getElementById('mf-add-horario').onclick = ()=>{
+    const val = mfPicker.getValue();
+    if(horariosActuales.includes(val)){ showToast('Ese horario ya está agregado', 'error'); return; }
+    horariosActuales.push(val);
+    renderHorariosChips();
+  };
+
   document.getElementById('mf-save').onclick = ()=>{
     const nombre = document.getElementById('mf-nombre').value.trim();
     const dosis = document.getElementById('mf-dosis').value.trim();
-    const horarios = document.getElementById('mf-horarios').value.split(',').map(s=>s.trim()).filter(Boolean);
-    if(!nombre || horarios.length===0) return;
+    if(!nombre || horariosActuales.length===0){
+      if(!nombre){ showToast('Escribe el nombre del medicamento', 'error'); }
+      else { showToast('Agrega al menos un horario', 'error'); }
+      return;
+    }
+    const horarios = [...horariosActuales].sort();
     if(existing){
       existing.nombre=nombre; existing.dosis=dosis; existing.horarios=horarios;
     } else {
