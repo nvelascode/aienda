@@ -1482,10 +1482,10 @@ function openGastoModal(datos){
       '<div class="form-two">'+
         '<div class="frow"><label>Monto</label><input id="gasto-monto" type="number" min="0" placeholder="Ej: 25000" value="'+(base&&base.monto?base.monto:'')+'"></div>'+
         '<div class="frow"><label>Tipo</label><select id="gasto-tipo" class="settings-input">'+
-          (()=>{ const tipoInicial = (base&&base.tipo) || sugerirTipoGasto(base&&base.nombre) || 'necesidad'; return
+          (()=>{ const tipoInicial = (base&&base.tipo) || sugerirTipoGasto(base&&base.nombre) || 'necesidad'; return (
           '<option value="necesidad"'+(tipoInicial==='necesidad'?' selected':'')+'>Necesidad</option>'+
           '<option value="deseo"'+(tipoInicial==='deseo'?' selected':'')+'>Deseo / estilo de vida</option>'+
-          '<option value="ahorro"'+(tipoInicial==='ahorro'?' selected':'')+'>Ahorro / inversión</option>'; })()+
+          '<option value="ahorro"'+(tipoInicial==='ahorro'?' selected':'')+'>Ahorro / inversión</option>'); })()+
         '</select></div>'+
       '</div>'+
       '<div class="frow"><label>Fecha</label><input id="gasto-fecha" type="date"></div>'+
