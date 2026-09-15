@@ -604,7 +604,6 @@
         <div class="label" id="week-label"></div>
         <button id="week-next">›</button>
       </span>
-      <button id="btn-jump-date" title="Ir a un mes">📅</button>
       <button id="btn-toggle-vista-mes" title="Ver mes completo">🗓️</button>
     </div>
     <div id="week-days"></div>
@@ -647,13 +646,13 @@
       <button class="pill-btn yolk" id="btn-toggle-edit-mercado">✏️ Editar</button>
     </div>
     <div class="day-card">
-      <div id="default-list"></div>
-      <div class="add-row hidden" id="mkt-add-row" style="margin-top:8px;flex-wrap:wrap;">
+      <div class="add-row hidden" id="mkt-add-row" style="margin-bottom:10px;flex-wrap:wrap;">
         <select id="mkt-cat-select" class="settings-input" style="flex:1 1 100%;margin-bottom:6px;"></select>
         <input id="mkt-input" placeholder="Añadir producto a la lista...">
         <span id="mkt-mic-holder"></span>
         <button class="add-btn" id="mkt-add-btn">+</button>
       </div>
+      <div id="default-list"></div>
     </div>
   </div>
 
@@ -714,6 +713,15 @@
     </div>
     <div id="signos-list"></div>
   </div>
+
+  <!-- NOTAS -->
+  <div id="tab-notas" class="tabpanel hidden">
+    <div class="section-title">
+      Notas
+      <button class="pill-btn yolk" id="btn-add-nota">+ Nueva</button>
+    </div>
+    <div id="notas-list"></div>
+  </div>
 </div>
 
 <div class="tabbar">
@@ -722,9 +730,10 @@
   <button class="tab-btn" data-tab="cumple"><span class="ic">🎂</span>Cumpleaños<span class="tab-dot hidden" id="dot-cumple"></span></button>
   <button class="tab-btn" data-tab="pagos"><span class="ic">💳</span>Pagos<span class="tab-dot hidden" id="dot-pagos"></span></button>
   <button class="tab-btn" data-tab="mercado"><span class="ic">🛒</span>Mercado</button>
-  <button class="tab-btn" data-tab="presupuesto"><span class="ic">💰</span>Presupuesto<span class="tab-dot hidden" id="dot-presupuesto"></span></button>
+  <button class="tab-btn" data-tab="presupuesto"><span class="ic">💰</span>Finanzas<span class="tab-dot hidden" id="dot-presupuesto"></span></button>
   <button class="tab-btn" data-tab="medicamentos"><span class="ic">💊</span>Medic.<span class="tab-dot hidden" id="dot-medicamentos"></span></button>
   <button class="tab-btn" data-tab="signos"><span class="ic">🩺</span>Signos</button>
+  <button class="tab-btn" data-tab="notas"><span class="ic">📝</span>Notas</button>
 </div>
 
 <div id="modal-root"></div>
@@ -783,9 +792,10 @@ const TAB_DEFS = [
   {key:'cumple',       label:'Cumpleaños',    icon:'🎂'},
   {key:'pagos',        label:'Pagos',         icon:'💳'},
   {key:'mercado',      label:'Mercado',       icon:'🛒'},
-  {key:'presupuesto',  label:'Presupuesto',   icon:'💰'},
+  {key:'presupuesto',  label:'Finanzas',      icon:'💰'},
   {key:'medicamentos', label:'Medicamentos',  icon:'💊'},
   {key:'signos',       label:'Signos vitales',icon:'🩺'},
+  {key:'notas',        label:'Notas',         icon:'📝'},
 ];
 
 // Orden pensado como un recorrido típico de supermercado, de la entrada a la caja.
@@ -816,14 +826,16 @@ function blankState(){
     pagos:[],              // { id, nombre, dia } — el usuario agrega los suyos
     pagosStatus:{},       // { pagoId: { 'YYYY-MM': true } }
     mercadoDefault:[],     // { id, nombre, enCarrito, comprado } — el usuario arma su propia lista
+    mercadoCarritoExtra:[], // { id, nombre, comprado } — productos sueltos en el carrito (ej. dictados a la IA) que NO se agregan a la lista predeterminada
     presupuesto:{ categorias:[], gastos:[], ingresoMensual:null, metaFinanciera:'ahorrar' }, // categorias: ya no se usan desde la app (se quitó esa función), quedan solo por si había datos viejos; gastos: {id,nombre,monto,fecha,tipo}; tipo: 'necesidad'|'deseo'|'ahorro', elegido al registrar cada gasto
     medicamentos:[],      // { id, nombre, dosis, horarios:['08:00','14:00'] }
     medsStatus:{},         // { 'YYYY-MM-DD': { 'medId|hora': true } }
     signosVitales:[],      // { id, fecha:'YYYY-MM-DD', hora:'HH:MM', sistolica, diastolica, fc, glicemia, peso, otros:{metricaId:valor} }
     signosMetricas:[],      // { id, nombre, unidad } — métricas personalizadas adicionales (ej: TSH, Colesterol)
+    notas:[],               // { id, titulo, contenido, fecha } — vínculos favoritos, notas personales, listas, etc.
     settings:{
-      tabs:{ actividades:true, cumple:true, pagos:true, mercado:true, presupuesto:true, medicamentos:false, signos:false }, // qué pestañas se muestran (el contenido nunca se borra al desactivar)
-      tabOrder:['actividades','cumple','pagos','mercado','presupuesto','medicamentos','signos'], // orden de las pestañas en la barra inferior (Inicio siempre queda fija de primera)
+      tabs:{ actividades:true, cumple:true, pagos:true, mercado:true, presupuesto:true, medicamentos:false, signos:false, notas:false }, // qué pestañas se muestran (el contenido nunca se borra al desactivar)
+      tabOrder:['actividades','cumple','pagos','mercado','presupuesto','medicamentos','signos','notas'], // orden de las pestañas en la barra inferior (Inicio siempre queda fija de primera)
       weatherEnabled:false,
       micEnabled:false, // dictado por voz — apagado por defecto, se activa desde Configuración
       pushEnabled:false, // notificaciones push — apagadas por defecto, se activan desde Configuración
@@ -1075,6 +1087,10 @@ async function onLoggedIn(user){
   state = blankState();
   await loadState();
   if(!state.settings.tabOrder) state.settings.tabOrder = TAB_DEFS.map(t=>t.key); // cuentas antiguas que no tenían este campo
+  TAB_DEFS.forEach(t=>{
+    if(!state.settings.tabOrder.includes(t.key)) state.settings.tabOrder.push(t.key); // agrega pestañas nuevas (ej. Notas) que cuentas viejas no tenían
+    if(!(t.key in state.settings.tabs)) state.settings.tabs[t.key] = false;
+  });
   hideAuthScreen();
   applyDarkMode(); applyPersonalization(); applyTextScale();
   applyTabVisibility(); applyTabOrder(); applyWeatherVisibility(); applyMicVisibility(); applyAIVisibility(); applyVersiculosVisibility();
@@ -2178,15 +2194,20 @@ function openMedModal(existing, prefill){
 /* ================= RENDER: MERCADO ================= */
 // Carrito: los productos de la lista predeterminada marcados con enCarrito=true.
 // Tocar un producto en el carrito lo tacha (comprado), sin sacarlo del carrito.
+// El carrito combina dos fuentes: productos de la lista predeterminada marcados enCarrito,
+// y productos sueltos (mercadoCarritoExtra) que no forman parte de la lista predeterminada
+// (ej. lo que se dicta a la IA para comprar una sola vez).
 function renderMercadoCart(){
   const holder = document.getElementById('cart-list');
   holder.innerHTML='';
-  const enCarrito = state.mercadoDefault.filter(m=>m.enCarrito);
-  if(enCarrito.length===0){
+  const deLista = state.mercadoDefault.filter(m=>m.enCarrito).map(m=> ({...m, origen:'default'}));
+  const sueltos = state.mercadoCarritoExtra.map(m=> ({...m, origen:'extra'}));
+  const todos = [...deLista, ...sueltos];
+  if(todos.length===0){
     holder.innerHTML='<div class="empty-note">Tu carrito está vacío</div>';
     return;
   }
-  agruparPorCategoria(enCarrito).forEach(grupo=>{
+  agruparPorCategoria(todos).forEach(grupo=>{
     const catTitle=document.createElement('div');
     catTitle.className='mkt-cat-title';
     catTitle.textContent=grupo.categoria;
@@ -2203,10 +2224,19 @@ function renderMercadoCart(){
       const txt=document.createElement('div');
       txt.className='item-text'; txt.style.flex='1'; txt.textContent=m.nombre;
       row.appendChild(txt);
-      row.onclick=()=>{ m.comprado=!m.comprado; saveState(); renderAll(); };
+      row.onclick=()=>{
+        const real = m.origen==='default' ? state.mercadoDefault.find(x=>x.id===m.id) : state.mercadoCarritoExtra.find(x=>x.id===m.id);
+        if(real){ real.comprado=!real.comprado; saveState(); renderAll(); }
+      };
       holder.appendChild(row);
     });
   });
+}
+
+// Convierte solo la primera letra a mayúscula, sin tocar el resto (evita gritar "MERCADO" si ya venía así)
+function capitalizarPrimera(s){
+  if(!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // Lista predeterminada: productos fijos que se pueden sumar/restar; chulear uno lo manda al carrito de arriba.
@@ -2351,6 +2381,7 @@ function renderAll(){
   renderMedsList();
   renderSignosList();
   prepSignosForm();
+  renderNotas();
 }
 
 /* ================= RENDER: SIGNOS VITALES ================= */
@@ -2599,6 +2630,85 @@ async function exportSignosPDF(){
   doc.save('signos-vitales-aienda.pdf'); // navegadores sin "compartir": lo descarga directo
 }
 
+/* ================= NOTAS (vínculos favoritos, notas personales, listas...) ================= */
+function renderNotas(){
+  const holder = document.getElementById('notas-list');
+  if(!holder) return;
+  holder.innerHTML='';
+  if(state.notas.length===0){
+    holder.innerHTML = '<div class="empty-note">Aún no tienes notas. Toca "+ Nueva" para crear la primera.</div>';
+    return;
+  }
+  const sorted = [...state.notas].sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
+  sorted.forEach(n=>{
+    if(pendingDeletes[n.id]){ holder.appendChild(pendingDeleteRow(n.id, n.titulo)); return; }
+    const card = document.createElement('div');
+    card.className='pago-card';
+    const preview = (n.contenido||'').length>140 ? n.contenido.slice(0,140)+'…' : (n.contenido||'');
+    card.innerHTML = '<div class="pago-top"><div style="flex:1;"><div class="pago-name">'+esc(n.titulo)+'</div>'+
+      '<div class="pago-day" style="white-space:pre-wrap;">'+esc(preview)+'</div></div></div>';
+    const actions = document.createElement('div');
+    actions.style.cssText='display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;';
+    const shareBtn = document.createElement('button');
+    shareBtn.className='link-btn'; shareBtn.style.padding='0'; shareBtn.textContent='📤 Compartir';
+    shareBtn.onclick = ()=> compartirNota(n);
+    actions.appendChild(shareBtn);
+    const editBtn = document.createElement('button');
+    editBtn.className='link-btn'; editBtn.style.padding='0'; editBtn.textContent='✏️ Editar';
+    editBtn.onclick = ()=> openNotaModal(n);
+    actions.appendChild(editBtn);
+    const delBtn = document.createElement('button');
+    delBtn.className='link-btn'; delBtn.style.cssText='padding:0;color:var(--brick);'; delBtn.textContent='✕ Eliminar';
+    delBtn.onclick = ()=>{
+      if(!confirm('¿Eliminar la nota "'+n.titulo+'"?')) return;
+      scheduleDelete(n.id, n.titulo, ()=>{
+        state.notas = state.notas.filter(x=>x.id!==n.id);
+        saveState();
+      });
+    };
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
+    holder.appendChild(card);
+  });
+}
+
+// Comparte una nota usando el selector nativo del celular (WhatsApp, correo, etc.).
+// Si el navegador no soporta compartir nativo, cae a un enlace directo de WhatsApp Web.
+async function compartirNota(n){
+  const texto = n.titulo + '\n\n' + (n.contenido||'');
+  if(navigator.share){
+    try{ await navigator.share({ title:n.titulo, text:texto }); return; }
+    catch(e){ /* si cancela el compartir, no pasa nada */ return; }
+  }
+  window.open('https://wa.me/?text='+encodeURIComponent(texto), '_blank');
+}
+
+function openNotaModal(existing){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = '';
+  const bg = document.createElement('div'); bg.className='modal-bg';
+  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
+  const modal = document.createElement('div'); modal.className='modal';
+  modal.innerHTML = '<h3>'+(existing?'Editar nota':'Nueva nota')+'</h3>'+
+    '<div class="form-card" style="border-style:solid;">'+
+      '<div class="frow"><label>Título</label><input id="nota-titulo" placeholder="Ej: Libros por leer, Link receta..." value="'+(existing?esc(existing.titulo):'')+'"></div>'+
+      '<div class="frow"><label>Contenido</label><textarea id="nota-contenido" rows="6" placeholder="Escribe tu nota, pega un link, o haz una lista...">'+(existing&&existing.contenido?esc(existing.contenido):'')+'</textarea></div>'+
+    '</div>'+
+    '<button class="close-btn" id="nota-save">Guardar nota</button>';
+  bg.appendChild(modal); root.appendChild(bg);
+  document.getElementById('nota-save').onclick = ()=>{
+    const titulo = document.getElementById('nota-titulo').value.trim();
+    const contenido = document.getElementById('nota-contenido').value.trim();
+    if(!titulo) { showToast('Ponle un título a la nota', 'error'); return; }
+    if(existing){
+      existing.titulo = titulo; existing.contenido = contenido;
+    } else {
+      state.notas.push({ id:uid(), titulo, contenido, fecha:dateKey(new Date()) });
+    }
+    saveState(); root.innerHTML=''; renderAll();
+  };
+}
+
 /* ================= HOME: esta semana / próxima semana (carrusel horizontal) ================= */
 function buildSimpleDayCard(d){
   const dname = DAY_NAMES[(d.getDay()+6)%7];
@@ -2751,8 +2861,12 @@ function applyVersiculosVisibility(){
 
 /* ================= ASISTENTE DE IA (beta, solo cuentas autorizadas) ================= */
 function applyAIVisibility(){
-  document.getElementById('ai-fab').classList.toggle('hidden', !state.settings.aiEnabled);
+  const modalAbierto = document.getElementById('modal-root').children.length>0;
+  document.getElementById('ai-fab').classList.toggle('hidden', !state.settings.aiEnabled || modalAbierto);
 }
+// El botón flotante de IA se oculta solo mientras haya un modal abierto (ej. editando algo),
+// para que nunca tape botones o campos con los que hay que interactuar.
+new MutationObserver(applyAIVisibility).observe(document.getElementById('modal-root'), { childList:true });
 
 async function checkAIAccess(){
   try{
@@ -3149,12 +3263,11 @@ function abrirFormularioConIA(data){
     productos = productos.map(p=> String(p||'').trim()).filter(Boolean);
     if(productos.length===0){ showToast('No logré entender qué producto era', 'error'); return; }
     productos.forEach(nombreProducto=>{
-      let prod = state.mercadoDefault.find(m=> m.nombre.toLowerCase()===nombreProducto.toLowerCase());
-      if(!prod){
-        prod = { id:uid(), nombre:nombreProducto, enCarrito:true, comprado:false };
-        state.mercadoDefault.push(prod);
-      } else {
-        prod.enCarrito = true;
+      const existente = state.mercadoDefault.find(m=> normalizarBusqueda(m.nombre)===normalizarBusqueda(nombreProducto));
+      if(existente){
+        existente.enCarrito = true; // ya existía en la lista predeterminada, solo se activa en el carrito
+      } else if(!state.mercadoCarritoExtra.some(m=> normalizarBusqueda(m.nombre)===normalizarBusqueda(nombreProducto))){
+        state.mercadoCarritoExtra.push({ id:uid(), nombre:capitalizarPrimera(nombreProducto), comprado:false }); // suelto, no entra a la lista predeterminada
       }
     });
     saveState(); renderAll();
@@ -3477,13 +3590,11 @@ document.getElementById('btn-toggle-vista-mes').onclick = ()=>{
   document.getElementById('weeknav-semana-controls').classList.toggle('hidden', actividadesModoMes);
   document.getElementById('week-days').classList.toggle('hidden', actividadesModoMes);
   document.getElementById('month-view').classList.toggle('hidden', !actividadesModoMes);
-  document.getElementById('btn-jump-date').classList.toggle('hidden', actividadesModoMes);
   document.getElementById('btn-toggle-vista-mes').textContent = actividadesModoMes ? '📆' : '🗓️';
   document.getElementById('btn-toggle-vista-mes').title = actividadesModoMes ? 'Ver semana' : 'Ver mes completo';
   if(actividadesModoMes) mesViewDate = new Date(activitiesWeekStart);
   renderActividadesTab();
 };
-document.getElementById('btn-jump-date').onclick = ()=> openJumpDateModal();
 
 /* ================= FESTIVOS DE COLOMBIA (calculados, no hay que actualizarlos a mano) ================= */
 function calcularPascua(year){
@@ -3552,7 +3663,6 @@ function festivosColombiaMap(year){
 }
 
 /* ================= CALENDARIO VISUAL (domingo a sábado, festivos y marcas de compromisos) ================= */
-let calViewDate = new Date();
 
 let actividadesModoMes = false;
 let mesViewDate = new Date();
@@ -3592,7 +3702,11 @@ function renderMonthView(){
       '<button class="cal-nav-btn" id="mes-next">›</button>'+
     '</div>'+
     '<div class="cal-weekdays">'+weekdayLabels.map(w=>'<div>'+w+'</div>').join('')+'</div>'+
-    '<div class="cal-grid" style="margin-bottom:14px;">'+cellsHtml+'</div>'+
+    '<div class="cal-grid" style="margin-bottom:10px;">'+cellsHtml+'</div>'+
+    '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;font-size:12px;color:var(--ink-soft);">'+
+      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--moss);margin-right:6px;"></span>Día con algo agendado</span>'+
+      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brick);margin-right:6px;"></span>Día festivo</span>'+
+    '</div>'+
     '<div id="mes-dia-detalle"></div>';
 
   document.getElementById('mes-prev').onclick = ()=>{ mesViewDate.setMonth(mesViewDate.getMonth()-1); renderMonthView(); };
@@ -3636,77 +3750,6 @@ function renderMesDiaDetalle(){
   holder.innerHTML=''; holder.appendChild(card);
 }
 
-function openJumpDateModal(){
-  calViewDate = new Date(activitiesWeekStart);
-  renderCalendarModal();
-}
-
-function renderCalendarModal(){
-  const root = document.getElementById('modal-root');
-  root.innerHTML = '';
-  const bg = document.createElement('div'); bg.className='modal-bg';
-  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
-  const modal = document.createElement('div'); modal.className='modal';
-
-  const year = calViewDate.getFullYear();
-  const month = calViewDate.getMonth();
-  const startOffset = new Date(year, month, 1).getDay(); // 0 = domingo
-  const daysInMonth = new Date(year, month+1, 0).getDate();
-  const festivos = festivosColombiaMap(year);
-  const hoy = new Date();
-  const weekdayLabels = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-
-  let cellsHtml = '';
-  for(let i=0;i<startOffset;i++){ cellsHtml += '<div class="cal-day outside"></div>'; }
-  for(let dia=1; dia<=daysInMonth; dia++){
-    const d = new Date(year, month, dia);
-    const key = dateKey(d);
-    const isToday = sameDate(d, hoy);
-    const holidayName = festivos[key];
-    const hasItems = buildDayItems(d).length>0;
-    let cls = 'cal-day';
-    if(isToday) cls += ' today';
-    if(holidayName) cls += ' holiday';
-    cellsHtml += '<div class="'+cls+'" data-date="'+key+'" data-holiday="'+(holidayName?esc(holidayName):'')+'">'+dia+
-      (hasItems?'<span class="cal-dot"></span>':'')+
-      '</div>';
-  }
-
-  modal.innerHTML = '<div class="cal-modal-head">'+
-      '<button class="cal-nav-btn" id="cal-prev">‹</button>'+
-      '<h3 style="margin:0;">'+MONTH_NAMES[month]+' '+year+'</h3>'+
-      '<button class="cal-nav-btn" id="cal-next">›</button>'+
-    '</div>'+
-    '<div class="cal-weekdays">'+weekdayLabels.map(w=>'<div>'+w+'</div>').join('')+'</div>'+
-    '<div class="cal-grid">'+cellsHtml+'</div>'+
-    '<div style="display:flex;flex-direction:column;gap:5px;margin-top:12px;font-size:12.5px;color:var(--ink-soft);">'+
-      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--moss);margin-right:6px;"></span>Día con algo agendado</span>'+
-      '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brick);margin-right:6px;"></span>Día festivo</span>'+
-    '</div>'+
-    '<button class="pill-btn yolk" id="cal-hoy" style="width:100%;margin-top:14px;">Ir a hoy</button>'+
-    '<button class="close-btn" id="cal-cerrar">Cerrar</button>';
-  bg.appendChild(modal); root.appendChild(bg);
-
-  document.getElementById('cal-prev').onclick = ()=>{ calViewDate.setMonth(calViewDate.getMonth()-1); renderCalendarModal(); };
-  document.getElementById('cal-next').onclick = ()=>{ calViewDate.setMonth(calViewDate.getMonth()+1); renderCalendarModal(); };
-  document.getElementById('cal-hoy').onclick = ()=>{
-    activitiesWeekStart = getMonday(new Date());
-    root.innerHTML=''; renderWeek();
-  };
-  document.getElementById('cal-cerrar').onclick = ()=>{ root.innerHTML=''; };
-
-  modal.querySelectorAll('.cal-day[data-date]').forEach(el=>{
-    el.onclick = ()=>{
-      const key = el.dataset.date;
-      const d = new Date(key+'T00:00:00');
-      const holiday = el.dataset.holiday;
-      if(holiday) showToast('Festivo: '+holiday, 'ok');
-      activitiesWeekStart = getMonday(d);
-      root.innerHTML=''; renderWeek();
-    };
-  });
-}
-
 document.getElementById('btn-add-bday').onclick = ()=> openBdayModal(null);
 document.getElementById('btn-add-pago').onclick = ()=> openPagoModal(null);
 document.getElementById('btn-toggle-edit-pagos').onclick = ()=>{
@@ -3729,8 +3772,12 @@ document.getElementById('mkt-add-btn').onclick = ()=>{
   const inp = document.getElementById('mkt-input');
   const val = inp.value.trim();
   if(!val) return;
+  if(state.mercadoDefault.some(m=> normalizarBusqueda(m.nombre)===normalizarBusqueda(val))){
+    showToast('Ese producto ya está en la lista', 'error');
+    return;
+  }
   const categoria = document.getElementById('mkt-cat-select').value;
-  state.mercadoDefault.push({id:uid(), nombre:val, categoria, enCarrito:false, comprado:false});
+  state.mercadoDefault.push({id:uid(), nombre:capitalizarPrimera(val), categoria, enCarrito:false, comprado:false});
   inp.value='';
   saveState(); renderAll();
 };
@@ -3738,6 +3785,7 @@ document.getElementById('mkt-input').addEventListener('keydown', e=>{ if(e.key==
 document.getElementById('mkt-mic-holder').appendChild(makeMicButton(document.getElementById('mkt-input')));
 document.getElementById('mkt-clear-btn').onclick = ()=>{
   state.mercadoDefault.forEach(m=>{ m.enCarrito=false; m.comprado=false; });
+  state.mercadoCarritoExtra = [];
   saveState(); renderAll();
 };
 
@@ -3776,6 +3824,7 @@ document.getElementById('sv-save').onclick = ()=>{
   if(avisos.length) showSignosWarningModal(avisos);
 };
 document.getElementById('btn-export-signos').onclick = exportSignosPDF;
+document.getElementById('btn-add-nota').onclick = ()=> openNotaModal(null);
 document.getElementById('btn-add-metrica').onclick = openMetricaModal;
 document.getElementById('btn-trends').onclick = openTrendsModal;
 document.getElementById('ai-fab').onclick = openAIModal;
