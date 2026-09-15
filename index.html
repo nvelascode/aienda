@@ -662,12 +662,6 @@
     <button class="pill-btn moss" id="btn-add-gasto" style="width:100%;margin-bottom:10px;">💰 Registrar gasto</button>
     <button class="pill-btn yolk" id="btn-plan-financiero" style="width:100%;margin-bottom:10px;">💡 ¿Quiero un plan financiero?</button>
     <div id="presupuesto-resumen-financiero" style="margin-bottom:14px;"></div>
-    <div class="section-title">
-      Categorías
-      <button class="pill-btn yolk" id="btn-toggle-edit-presupuesto">✏️ Editar</button>
-    </div>
-    <div id="presupuesto-categorias"></div>
-    <button class="pill-btn yolk hidden" id="btn-add-categoria" style="width:100%;margin-top:8px;">+ Agregar categoría</button>
 
     <div class="section-title" style="margin-top:26px;">
       Gastos de este mes
@@ -822,7 +816,7 @@ function blankState(){
     pagos:[],              // { id, nombre, dia } — el usuario agrega los suyos
     pagosStatus:{},       // { pagoId: { 'YYYY-MM': true } }
     mercadoDefault:[],     // { id, nombre, enCarrito, comprado } — el usuario arma su propia lista
-    presupuesto:{ categorias:[], gastos:[], ingresoMensual:null, metaFinanciera:'ahorrar' }, // categorias: {id,nombre,monto} — opcionales, solo para presupuesto fino por rubro; gastos: {id,categoriaId(opcional),nombre,monto,fecha,tipo}; tipo: 'necesidad'|'deseo'|'ahorro', elegido al registrar cada gasto
+    presupuesto:{ categorias:[], gastos:[], ingresoMensual:null, metaFinanciera:'ahorrar' }, // categorias: ya no se usan desde la app (se quitó esa función), quedan solo por si había datos viejos; gastos: {id,nombre,monto,fecha,tipo}; tipo: 'necesidad'|'deseo'|'ahorro', elegido al registrar cada gasto
     medicamentos:[],      // { id, nombre, dosis, horarios:['08:00','14:00'] }
     medsStatus:{},         // { 'YYYY-MM-DD': { 'medId|hora': true } }
     signosVitales:[],      // { id, fecha:'YYYY-MM-DD', hora:'HH:MM', sistolica, diastolica, fc, glicemia, peso, otros:{metricaId:valor} }
@@ -851,7 +845,6 @@ let activitiesWeekStart = getMonday(new Date()); // referencia de semana para la
 let editModePagos = false;
 let pagosSubTab = 'pendientes'; // 'pendientes' o 'pagados' — cuál lista se muestra en la pestaña Pagos
 let editModeMercado = false;
-let editModePresupuesto = false;
 let darkOverride = null; // null = automático según la hora; true/false = forzado a mano por el botón
 
 /* ================= MODO OSCURO (automático 7pm–6am, con botón para forzarlo) ================= */
@@ -1298,74 +1291,25 @@ function gastosDelMes(){
   const key = new Date().getFullYear()+'-'+pad(new Date().getMonth()+1);
   return state.presupuesto.gastos.filter(g=> g.fecha && g.fecha.startsWith(key));
 }
-function totalGastadoCategoria(catId){
-  return gastosDelMes().filter(g=>g.categoriaId===catId).reduce((s,g)=> s+(parseFloat(g.monto)||0), 0);
-}
 
 function renderPresupuesto(){
   renderResumenFinanciero();
-  const holder = document.getElementById('presupuesto-categorias');
-  if(!holder) return;
-  holder.innerHTML='';
-  const cats = state.presupuesto.categorias;
-  let totalPresupuestado=0, totalGastado=0;
-  cats.forEach(c=>{
-    if(pendingDeletes[c.id]){ holder.appendChild(pendingDeleteRow(c.id, c.nombre)); return; }
-    const gastado = totalGastadoCategoria(c.id);
-    totalPresupuestado += (parseFloat(c.monto)||0);
-    totalGastado += gastado;
-    const pct = c.monto>0 ? Math.min(100, Math.round((gastado/c.monto)*100)) : 0;
-    const over = gastado > c.monto;
-    const card = document.createElement('div');
-    card.className='budget-card';
-    card.innerHTML = '<div class="budget-top"><span class="budget-name">'+esc(c.nombre)+'</span><span class="budget-amounts">'+formatMoney(gastado)+' / '+formatMoney(c.monto)+'</span></div>'+
-      '<div class="budget-bar-track"><div class="budget-bar-fill'+(over?' over':'')+'" style="width:'+pct+'%;"></div></div>';
-    if(editModePresupuesto){
-      const actions=document.createElement('div');
-      actions.style.cssText='display:flex;gap:8px;margin-top:8px;';
-      const editBtn=document.createElement('button');
-      editBtn.className='link-btn'; editBtn.style.padding='0'; editBtn.textContent='✏️ Editar';
-      editBtn.onclick=()=> openCategoriaModal(c);
-      actions.appendChild(editBtn);
-      const delBtn=document.createElement('button');
-      delBtn.className='link-btn'; delBtn.style.cssText='padding:0;color:var(--brick);'; delBtn.textContent='✕ Eliminar';
-      delBtn.onclick=()=> scheduleDelete(c.id, c.nombre, ()=>{
-        state.presupuesto.categorias = state.presupuesto.categorias.filter(x=>x.id!==c.id);
-        state.presupuesto.gastos = state.presupuesto.gastos.filter(g=>g.categoriaId!==c.id);
-        saveState();
-      });
-      actions.appendChild(delBtn);
-      card.appendChild(actions);
-    }
-    holder.appendChild(card);
-  });
-  if(cats.length===0){
-    holder.innerHTML = '<div class="empty-note">Aún no hay categorías. Toca "+ Agregar categoría" para empezar.</div>';
-  } else {
-    const resumen = document.createElement('div');
-    resumen.className='budget-card';
-    resumen.style.borderStyle='dashed';
-    const pctTotal = totalPresupuestado>0 ? Math.min(100, Math.round((totalGastado/totalPresupuestado)*100)) : 0;
-    resumen.innerHTML = '<div class="budget-top"><span class="budget-name">Total del mes</span><span class="budget-amounts">'+formatMoney(totalGastado)+' / '+formatMoney(totalPresupuestado)+'</span></div>'+
-      '<div class="budget-bar-track"><div class="budget-bar-fill'+(totalGastado>totalPresupuestado?' over':'')+'" style="width:'+pctTotal+'%;"></div></div>';
-    holder.insertBefore(resumen, holder.firstChild);
-  }
-
   const gholder = document.getElementById('presupuesto-gastos');
+  if(!gholder) return;
   gholder.innerHTML='';
   const gastos = gastosDelMes().slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
   if(gastos.length===0){
     gholder.innerHTML = '<div class="empty-note">Aún no hay gastos registrados este mes.</div>';
     return;
   }
+  const etiquetasTipo = {necesidad:'Necesidad', deseo:'Deseo', ahorro:'Ahorro'};
   gastos.forEach(g=>{
     if(pendingDeletes[g.id]){ gholder.appendChild(pendingDeleteRow(g.id, g.nombre)); return; }
-    const cat = state.presupuesto.categorias.find(c=>c.id===g.categoriaId);
     const d = new Date(g.fecha+'T00:00:00');
     const row=document.createElement('div');
     row.className='pago-card';
     row.innerHTML = '<div class="pago-top"><div><div class="pago-name">'+esc(g.nombre)+'</div>'+
-      '<div class="pago-day">'+(cat?esc(cat.nombre)+' · ':'')+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</div></div>'+
+      '<div class="pago-day">'+(g.tipo?esc(etiquetasTipo[g.tipo]||g.tipo)+' · ':'')+d.getDate()+' de '+MONTH_NAMES[d.getMonth()]+'</div></div>'+
       '<span class="badge ok">'+formatMoney(g.monto)+'</span></div>';
     const del=document.createElement('button');
     del.className='link-btn'; del.style.cssText='padding:0;color:var(--brick);';
@@ -1519,30 +1463,6 @@ function openPlanFinancieroModal(){
   document.getElementById('pf-cerrar').onclick = ()=>{ root.innerHTML=''; renderResumenFinanciero(); };
 }
 
-function openCategoriaModal(existing, prefill){
-  const root = document.getElementById('modal-root');
-  root.innerHTML = '';
-  const bg = document.createElement('div'); bg.className='modal-bg';
-  bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
-  const modal = document.createElement('div'); modal.className='modal';
-  const base = existing || prefill || {};
-  modal.innerHTML = '<h3>'+(existing?'Editar categoría':'Nueva categoría')+'</h3>'+
-    '<div class="form-card" style="border-style:solid;">'+
-      '<div class="frow"><label>Nombre</label><input id="cat-nombre" placeholder="Ej: Mercado" value="'+(base.nombre?esc(base.nombre):'')+'"></div>'+
-      '<div class="frow"><label>Presupuesto mensual</label><input id="cat-monto" type="number" min="0" placeholder="Ej: 300000" value="'+(base.monto||'')+'"></div>'+
-    '</div>'+
-    '<button class="close-btn" id="cat-save">Guardar categoría</button>';
-  bg.appendChild(modal); root.appendChild(bg);
-  document.getElementById('cat-save').onclick = ()=>{
-    const nombre = document.getElementById('cat-nombre').value.trim();
-    const monto = parseFloat(document.getElementById('cat-monto').value);
-    if(!nombre || isNaN(monto) || monto<0) return;
-    if(existing){ existing.nombre=nombre; existing.monto=monto; }
-    else { state.presupuesto.categorias.push({id:uid(), nombre, monto}); }
-    saveState(); root.innerHTML=''; renderAll();
-  };
-}
-
 function openGastoModal(datos){
   const existing = datos && datos.id ? datos : null; // si trae id, es un gasto real que se está editando
   const prefill = existing ? null : datos; // si no trae id, es un prellenado de la IA para uno nuevo
@@ -1552,7 +1472,6 @@ function openGastoModal(datos){
   const bg = document.createElement('div'); bg.className='modal-bg';
   bg.onclick = (e)=>{ if(e.target===bg) root.innerHTML=''; };
   const modal = document.createElement('div'); modal.className='modal';
-  const cats = state.presupuesto.categorias;
   modal.innerHTML = '<h3>'+(existing?'Editar gasto':'Registrar gasto')+'</h3>'+
     (prefill?'<p style="font-size:12px;color:var(--ink-soft);margin-top:-8px;">✨ Revisa lo que entendí antes de guardar.</p>':'')+
     '<div class="form-card" style="border-style:solid;">'+
@@ -1569,10 +1488,6 @@ function openGastoModal(datos){
           '<option value="ahorro"'+(tipoInicial==='ahorro'?' selected':'')+'>Ahorro / inversión</option>'; })()+
         '</select></div>'+
       '</div>'+
-      (cats.length>0 ? '<div class="frow"><label>Categoría (opcional)</label><select id="gasto-categoria" class="settings-input">'+
-          '<option value="">Sin categoría</option>'+
-          cats.map(c=>'<option value="'+c.id+'"'+(base&&base.categoriaId===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>').join('')+
-        '</select></div>' : '')+
       '<div class="frow"><label>Fecha</label><input id="gasto-fecha" type="date"></div>'+
     '</div>'+
     '<button class="close-btn" id="gasto-save">'+(existing?'Guardar cambios':'Guardar gasto')+'</button>';
@@ -1590,13 +1505,12 @@ function openGastoModal(datos){
     const nombre = document.getElementById('gasto-nombre').value.trim();
     const monto = parseFloat(document.getElementById('gasto-monto').value);
     const tipo = document.getElementById('gasto-tipo').value;
-    const categoriaId = (cats.length>0 && document.getElementById('gasto-categoria').value) || null;
     const fecha = document.getElementById('gasto-fecha').value || dateKey(new Date());
     if(!nombre || isNaN(monto) || monto<=0) return;
     if(existing){
-      existing.nombre = nombre; existing.monto = monto; existing.tipo = tipo; existing.categoriaId = categoriaId; existing.fecha = fecha;
+      existing.nombre = nombre; existing.monto = monto; existing.tipo = tipo; existing.fecha = fecha;
     } else {
-      state.presupuesto.gastos.push({id:uid(), nombre, monto, tipo, categoriaId, fecha});
+      state.presupuesto.gastos.push({id:uid(), nombre, monto, tipo, fecha});
     }
     saveState(); root.innerHTML=''; renderAll();
   };
@@ -1662,7 +1576,8 @@ function renderAlerts(){
 
   let hasPresAlert=false;
   if(state.settings.tabs.presupuesto){
-    hasPresAlert = state.presupuesto.categorias.some(c=> (parseFloat(c.monto)||0)>0 && totalGastadoCategoria(c.id) > (parseFloat(c.monto)||0));
+    const r = calcularResumenFinanciero();
+    hasPresAlert = !!(r && r.sinRegistrarMonto < 0);
   }
 
   document.getElementById('dot-cumple').classList.toggle('hidden', !hasCumpleAlert);
@@ -2997,7 +2912,7 @@ async function procesarTextoIA(texto, root, estadoEl){
     const token = session && session.access_token;
     const res = await fetch('/api/ai-assist', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ token, text: texto, categorias: state.presupuesto.categorias.map(c=>c.nombre), contexto: construirContextoIA() })
+      body: JSON.stringify({ token, text: texto, contexto: construirContextoIA() })
     });
     if(res.status===403){ root.innerHTML=''; showPaywallModal(); return; }
     if(!res.ok){
@@ -3081,7 +2996,7 @@ function construirContextoIA(){
       const info = pagoInfo(p, hoy);
       return { nombre:p.nombre, diaDelMes:p.dia, frecuencia:p.frecuencia||'mensual', pagado:info.paid, diasParaVencer:info.diffDays };
     }),
-    presupuesto: state.presupuesto.categorias.map(c=>({ nombre:c.nombre, presupuestoMensual:c.monto, gastadoEsteMes:totalGastadoCategoria(c.id) })),
+    presupuesto: (()=>{ const r = calcularResumenFinanciero(); return r ? { ingresoMensual:r.ingreso, gastadoEnNecesidades:r.necesidadMonto, gastadoEnDeseos:r.deseoMonto, ahorradoOInvertido:r.ahorroMonto, sinRegistrar:r.sinRegistrarMonto } : null; })(),
     medicamentos: state.medicamentos.map(m=>({ nombre:m.nombre, dosis:m.dosis, horarios:(m.horarios||[]).map(formatearHoraHablada) })),
     mercado: {
       enCarritoPendiente: state.mercadoDefault.filter(m=>m.enCarrito && !m.comprado).map(m=>m.nombre),
@@ -3218,8 +3133,7 @@ function abrirFormularioConIA(data){
     if(c.peso!=null) document.getElementById('sv-peso').value = c.peso;
     showToast('Revisa los valores y toca "Guardar registro"', 'ok');
   } else if(tipo==='gasto'){
-    const cat = state.presupuesto.categorias.find(x=> x.nombre.toLowerCase()===String(c.categoria||'').toLowerCase());
-    openGastoModal({ nombre:c.nombre, monto:c.monto, categoriaId: cat?cat.id:null, fecha:c.fecha });
+    openGastoModal({ nombre:c.nombre, monto:c.monto, tipo:c.tipo, fecha:c.fecha });
   } else if(tipo==='actividad'){
     const fecha = c.fecha || dateKey(new Date());
     openActivityModal(fecha, null, null, { nombre:c.nombre, hora:c.hora, notas:c.notas, repite:c.repite });
@@ -3229,8 +3143,6 @@ function abrirFormularioConIA(data){
     openPagoModal(null, { nombre:c.nombre, dia:c.dia, frecuencia:c.frecuencia });
   } else if(tipo==='medicamento'){
     openMedModal(null, { nombre:c.nombre, dosis:c.dosis, horarios:c.horarios });
-  } else if(tipo==='categoria'){
-    openCategoriaModal(null, { nombre:c.nombre, monto:c.monto });
   } else if(tipo==='mercado'){
     // Soporta uno o varios productos: c.productos (arreglo) o, por compatibilidad, c.nombre (uno solo)
     let productos = Array.isArray(c.productos) ? c.productos : (c.nombre ? [c.nombre] : []);
@@ -3837,16 +3749,9 @@ document.getElementById('btn-search-toggle').onclick = ()=>{
 };
 document.getElementById('search-input').addEventListener('input', e=> renderSearchResults(e.target.value));
 document.getElementById('search-input').addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarBusqueda(); });
-document.getElementById('btn-add-categoria').onclick = ()=> openCategoriaModal(null);
 document.getElementById('btn-plan-financiero').onclick = openPlanFinancieroModal;
 document.getElementById('btn-add-gasto').onclick = ()=> openGastoModal();
 document.getElementById('btn-add-gasto-home').onclick = ()=> openGastoModal();
-document.getElementById('btn-toggle-edit-presupuesto').onclick = ()=>{
-  editModePresupuesto = !editModePresupuesto;
-  document.getElementById('btn-toggle-edit-presupuesto').textContent = editModePresupuesto ? '✓ Listo' : '✏️ Editar';
-  document.getElementById('btn-add-categoria').classList.toggle('hidden', !editModePresupuesto);
-  renderPresupuesto();
-};
 document.getElementById('btn-add-med').onclick = ()=> openMedModal(null);
 document.getElementById('sv-save').onclick = ()=>{
   const fecha = document.getElementById('sv-fecha').value || dateKey(new Date());
